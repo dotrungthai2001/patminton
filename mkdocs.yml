@@ -1,7 +1,7 @@
 site_name: patas
 site_description: GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography
 site_url: https://patas.readthedocs.io/
-repo_url: https://github.com/trungthai1771/patas
+repo_url: https://github.com/dotrungthai2001/patas
 copyright: Copyright &copy; 2026 the patas authors
 
 theme:

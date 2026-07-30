@@ -30,7 +30,7 @@ dependencies = [
 
 [project.urls]
 Documentation = "https://patas.readthedocs.io/"
-Source = "https://github.com/trungthai1771/patas"
+Source = "https://github.com/dotrungthai2001/patas"
 
 [project.optional-dependencies]
 docs = [
