@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patas"
+version = "0.1.0"
+description = "GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Trung-Thai Do", email = "trungthai1771@gmail.com" },
+    { name = "Paul Escande" },
+    { name = "Caroline Chaux" },
+    { name = "Jérôme Gateau" },
+    { name = "Hwee Kuan Lee" },
+]
+keywords = ["photoacoustic", "tomography", "CUDA", "inverse-problems", "imaging"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch",
+]
+
+[project.urls]
+Documentation = "https://patas.readthedocs.io/"
+Source = "https://github.com/trungthai1771/patas"
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5,<10",
+]
+test = [
+    "pytest>=7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+patas = ["cuda/**/*.cu", "cuda/**/*.cuh", "cuda/**/*.h"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: requires a CUDA GPU and the compiled libpat_gpu.so (deselect with '-m \"not gpu\"')",
+]

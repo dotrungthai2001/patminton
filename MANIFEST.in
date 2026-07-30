@@ -1,0 +1,2 @@
+graft src/patas/cuda
+global-exclude *.so *.o __pycache__/*

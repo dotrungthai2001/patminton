@@ -1,0 +1,6 @@
+# Documentation build requirements. The docs are plain Markdown, so neither
+# the compiled CUDA library nor numpy/scipy/torch are needed to build them.
+# mkdocs is capped below 2.0: it drops the plugin and theming systems that
+# mkdocs-material relies on, with no migration path.
+mkdocs>=1.6,<2
+mkdocs-material>=9.5,<10
