@@ -2,7 +2,7 @@
 
 This walk-through simulates the signals of a point absorber and reconstructs
 it. A complete script is in
-[`examples/point_phantom.py`](https://github.com/dotrungthai2001/patas/blob/main/examples/point_phantom.py).
+[`examples/point_phantom.py`](https://github.com/dotrungthai2001/patminton/blob/main/examples/point_phantom.py).
 
 ## Define the acquisition geometry
 

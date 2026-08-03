@@ -1,7 +1,7 @@
 site_name: patminton
 site_description: GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography
-site_url: https://patas.readthedocs.io/
-repo_url: https://github.com/dotrungthai2001/patas
+site_url: https://patminton.readthedocs.io/
+repo_url: https://github.com/dotrungthai2001/patminton
 copyright: Copyright &copy; 2026 the patminton authors
 
 theme:

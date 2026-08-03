@@ -1,2 +1,3 @@
 graft src/patminton/cuda
+graft tests
 global-exclude *.so *.o __pycache__/*
