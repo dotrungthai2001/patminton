@@ -1,4 +1,4 @@
-# patas
+# patminton
 
 **GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography.**
 
@@ -9,7 +9,7 @@ array of ultrasound transducers. The goal is to recover the 3D initial
 pressure distribution $p(x)$ — which reflects the optical absorption of the
 tissue — from the recorded time-domain signals $s(t)$.
 
-`patas` implements the forward operator (pressure → signals) and its adjoint
+`patminton` implements the forward operator (pressure → signals) and its adjoint
 as **on-the-fly matrix-vector products** on the GPU, following the strategy
 of Ding, Razansky and Deán-Ben (IEEE TMI, 2020). The system matrix is never
 stored: for a 100³ grid, 10⁴ transducer positions and 512 time samples it
@@ -38,7 +38,7 @@ tractable on a single GPU.
 
 ```python
 import torch
-from patas import PAT, translation_rotation_system, least_squares_CG
+from patminton import PAT, translation_rotation_system, least_squares_CG
 
 infos = translation_rotation_system(
     transducer_radius=25e-3, transducer_height=7.5e-3,

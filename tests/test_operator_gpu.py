@@ -14,14 +14,14 @@ import numpy as np
 import pytest
 import torch
 
-import patas
+import patminton
 
 
 def _lib_available():
-    env = os.environ.get("PATAS_LIB")
+    env = os.environ.get("PATMINTON_LIB")
     if env:
         return Path(env).exists()
-    return (Path(patas.__file__).resolve().parent / "libpat_gpu.so").exists()
+    return (Path(patminton.__file__).resolve().parent / "libpat_gpu.so").exists()
 
 
 pytestmark = [
@@ -47,7 +47,7 @@ DEVICE = "cuda:0"
 
 @pytest.fixture(scope="module")
 def infos():
-    infos = patas.translation_rotation_system(
+    infos = patminton.translation_rotation_system(
         transducer_radius=RADIUS,
         transducer_height=HEIGHT,
         transducer_width=WIDTH,
@@ -64,10 +64,10 @@ def make_pat(mode, infos, **kwargs):
                   laser_pulse_variance=5e-9)
     common.update(kwargs)
     if mode == "points":
-        points, area = patas.discretize_cylindrical_transducers(infos, 15, 3)
-        return patas.PAT(N, N, N, L, L, L, mode="points",
+        points, area = patminton.discretize_cylindrical_transducers(infos, 15, 3)
+        return patminton.PAT(N, N, N, L, L, L, mode="points",
                          locPoints=points, area=area, **common)
-    return patas.PAT(N, N, N, L, L, L, mode=mode,
+    return patminton.PAT(N, N, N, L, L, L, mode=mode,
                      infos_transducers=infos, **common)
 
 
@@ -119,7 +119,7 @@ def test_point_source_arrival_time(infos):
     s = (pat @ p).cpu().numpy()
     assert np.abs(s).max() > 0
 
-    points, _ = patas.discretize_cylindrical_transducers(infos, 31, 5)
+    points, _ = patminton.discretize_cylindrical_transducers(infos, 31, 5)
     for i in range(s.shape[0]):
         d = np.linalg.norm(points[i], axis=1)  # source at the origin
         t_peak = TSTART + np.argmax(np.abs(s[i])) * DT

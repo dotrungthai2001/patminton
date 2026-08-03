@@ -1,2 +1,2 @@
-graft src/patas/cuda
+graft src/patminton/cuda
 global-exclude *.so *.o __pycache__/*

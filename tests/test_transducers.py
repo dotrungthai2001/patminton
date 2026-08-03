@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from patas import discretize_cylindrical_transducers, translation_rotation_system
+from patminton import discretize_cylindrical_transducers, translation_rotation_system
 
 RADIUS = 25e-3
 HEIGHT = 7.5e-3

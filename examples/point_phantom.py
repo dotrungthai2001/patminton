@@ -5,7 +5,7 @@ Runs on a small 64^3 grid so it fits on a laptop GPU in a few seconds.
 
 import torch
 
-from patas import (
+from patminton import (
     PAT,
     least_squares_CG,
     normalize_operator,

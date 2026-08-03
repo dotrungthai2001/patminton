@@ -1,6 +1,6 @@
 """Make the package importable when running pytest from the repo root
 without installing it (the compiled CUDA library is not needed for the
-CPU tests; patas loads it lazily)."""
+CPU tests; patminton loads it lazily)."""
 
 import sys
 from pathlib import Path

@@ -32,11 +32,11 @@ pip install -e .
 
 To build for other GPUs than the build machine — e.g. compiling on a cluster
 login node without a GPU, or producing one binary for several node types —
-set `PATAS_CUDA_ARCH` to a list of compute capabilities:
+set `PATMINTON_CUDA_ARCH` to a list of compute capabilities:
 
 ```bash
 # V100 (sm_70) + A100 (sm_80) + RTX 30xx (sm_86), with PTX for newer GPUs
-PATAS_CUDA_ARCH="70;80;86" pip install .
+PATMINTON_CUDA_ARCH="70;80;86" pip install .
 ```
 
 Each listed architecture gets native SASS code; the last one also gets
@@ -46,8 +46,8 @@ Other environment variables:
 
 | Variable | Effect |
 | --- | --- |
-| `PATAS_NVCC` | Path to the `nvcc` binary if not on `PATH`. |
-| `PATAS_LIB` | At runtime, load this `.so` instead of the one shipped with the package. |
+| `PATMINTON_NVCC` | Path to the `nvcc` binary if not on `PATH`. |
+| `PATMINTON_LIB` | At runtime, load this `.so` instead of the one shipped with the package. |
 
 ## Manual build (without pip)
 
@@ -55,10 +55,10 @@ The CUDA library can also be compiled directly:
 
 ```bash
 nvcc -Xcompiler -fPIC -shared \
-     -Isrc/patas/cuda/include \
-     -o libpat_gpu.so src/patas/cuda/src/*.cu src/patas/cuda/libpat.cu \
+     -Isrc/patminton/cuda/include \
+     -o libpat_gpu.so src/patminton/cuda/src/*.cu src/patminton/cuda/libpat.cu \
      -lcufft -arch=native
-export PATAS_LIB=$PWD/libpat_gpu.so
+export PATMINTON_LIB=$PWD/libpat_gpu.so
 ```
 
 With CUDA ≥ 13, add `-static-global-template-stub=false`.
@@ -66,8 +66,8 @@ With CUDA ≥ 13, add `-static-global-template-stub=false`.
 ## Verify the installation
 
 ```python
-import torch, patas
-pat = patas.PAT(...)  # see Quickstart
+import torch, patminton
+pat = patminton.PAT(...)  # see Quickstart
 ```
 
 A quick adjoint (dot-product) test validates the build: for random $p$ and

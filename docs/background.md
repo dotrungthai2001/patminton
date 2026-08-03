@@ -1,6 +1,6 @@
 # Background
 
-These pages describe the model implemented by `patas` and how to use it:
+These pages describe the model implemented by `patminton` and how to use it:
 
 - [Physical and mathematical model](theory.md) — the forward operator, its
   adjoint, and the elliptic-integral formulation for cylindrical elements.

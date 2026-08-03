@@ -14,7 +14,7 @@ generates one 12-parameter row per element position:
 ```python
 import numpy as np
 import torch
-from patas import PAT, translation_rotation_system
+from patminton import PAT, translation_rotation_system
 
 c = 1540.0        # speed of sound (m/s)
 Fc = 5e6          # transducer central frequency (Hz)
@@ -90,7 +90,7 @@ off by orders of magnitude.
 operator and the data to unit spectral norm; the minimizer is unchanged:
 
 ```python
-from patas import normalize_operator
+from patminton import normalize_operator
 
 pat_n, s_n, norm_A = normalize_operator(pat, s, p.shape)
 ```
@@ -98,7 +98,7 @@ pat_n, s_n, norm_A = normalize_operator(pat, s, p.shape)
 ## Reconstruct
 
 ```python
-from patas import least_squares_CG
+from patminton import least_squares_CG
 
 u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_CG(
     pat_n, s_n,

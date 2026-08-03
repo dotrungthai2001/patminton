@@ -104,7 +104,7 @@ $$
 reduces the problem to standard $k < 1$ integrals. On the GPU, the
 integrals are evaluated with the Carlson symmetric forms
 ($R_f$, $R_d$, $R_c$), implemented in
-`src/patas/cuda/src/elliptic_integrals.cuh` — or replaced by a lookup table,
+`src/patminton/cuda/src/elliptic_integrals.cuh` — or replaced by a lookup table,
 see [Transducer models](transducer-models.md).
 
 ## Data flow of a forward pass

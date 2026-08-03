@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from patas.algorithms import (
+from patminton.algorithms import (
     SNR,
     SNR_masked,
     SNR_per_plane,

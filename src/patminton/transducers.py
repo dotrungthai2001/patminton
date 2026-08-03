@@ -15,7 +15,7 @@ A cylindrical transducer element is described by 12 parameters (one row of the
 :func:`translation_rotation_system` generates the full set of element
 positions for a rotating and translating linear probe.
 :func:`discretize_cylindrical_transducers` samples each element surface into
-points, as required by the ``points`` mode of :class:`patas.PAT`.
+points, as required by the ``points`` mode of :class:`patminton.PAT`.
 """
 
 import numpy as np
@@ -53,7 +53,7 @@ def translation_rotation_system(transducer_radius: float,
 
     Returns:
         ``(nTrans, 12)`` array of transducer descriptions in the format
-        expected by :class:`patas.PAT` (see the module docstring).
+        expected by :class:`patminton.PAT` (see the module docstring).
 
     Raises:
         ValueError: If ``rotation_axis`` or ``translation_axis`` is not of
@@ -124,7 +124,7 @@ def translation_rotation_system(transducer_radius: float,
 def discretize_cylindrical_transducers(infos, number_points_height, number_points_width):
     """Sample the surface of each cylindrical element into points.
 
-    Used with ``mode='points'`` of :class:`patas.PAT`: each element surface
+    Used with ``mode='points'`` of :class:`patminton.PAT`: each element surface
     is replaced by a regular grid of point sensors with their associated
     surface areas.
 

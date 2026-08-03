@@ -65,7 +65,7 @@ class PAT:
         infos_transducers: ``(nTrans, 12)`` array describing the cylindrical
             elements (center, axis ``e1``, radial vector ``e2``, radius,
             half-aperture, half-height). Required for all ``cylinder_*``
-            modes. See :func:`patas.transducers.translation_rotation_system`.
+            modes. See :func:`patminton.transducers.translation_rotation_system`.
         n_arcs_per_cylinder: Number of arcs for ``mode='cylinder_arcs'``.
         n_planes_per_cylinder: Number of planes for ``mode='cylinder_planes'``.
         upsample: Time-axis oversampling factor used for the convolution with

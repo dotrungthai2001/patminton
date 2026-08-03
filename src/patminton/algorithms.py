@@ -1,6 +1,6 @@
 """Iterative reconstruction algorithms and image-quality metrics.
 
-All solvers take a :class:`patas.PAT` operator ``pat`` and the measured
+All solvers take a :class:`patminton.PAT` operator ``pat`` and the measured
 signals ``s_meas`` (a ``(nTrans, nT)`` float64 CUDA tensor), and share the
 return signature ``(u, F_list, SNR_list, SSIM_list, elapsed,
 SNR_planes_history)`` where ``u`` is the reconstructed volume and the lists

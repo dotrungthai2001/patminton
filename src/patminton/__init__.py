@@ -1,4 +1,4 @@
-"""patas — GPU-accelerated 3D photoacoustic tomography operators.
+"""patminton — GPU-accelerated 3D photoacoustic tomography operators.
 
 CUDA implementations of the forward and adjoint operators of 3D
 photoacoustic tomography (PAT) as on-the-fly matrix-vector products, plus

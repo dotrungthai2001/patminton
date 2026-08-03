@@ -1,4 +1,4 @@
-# patas — GPU-Accelerated 3D Photoacoustic Tomography
+# patminton — GPU-Accelerated 3D Photoacoustic Tomography
 
 CUDA implementations of the forward and adjoint operators of 3D
 photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for
@@ -7,7 +7,7 @@ CGLS, L-BFGS-B, PGD and Chambolle-Pock TV solvers built on top of them.
 
 For a 100³ grid observed by 10⁴ transducer positions with 512 time samples,
 the dense system matrix would occupy 100³ × 10⁴ × 512 × 8 B ≈ 41 TB in double
-precision; `patas` applies it and its adjoint on the fly on the GPU instead.
+precision; `patminton` applies it and its adjoint on the fly on the GPU instead.
 
 ## Installation
 
@@ -23,14 +23,14 @@ pip install .
 login node for V100 + A100 compute nodes):
 
 ```bash
-PATAS_CUDA_ARCH="70;80;86" pip install .
+PATMINTON_CUDA_ARCH="70;80;86" pip install .
 ```
 
 ## Quick example
 
 ```python
 import torch
-from patas import PAT, translation_rotation_system, least_squares_CG
+from patminton import PAT, translation_rotation_system, least_squares_CG
 
 infos = translation_rotation_system(
     transducer_radius=25e-3, transducer_height=7.5e-3,

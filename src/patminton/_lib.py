@@ -2,11 +2,11 @@
 
 The library is compiled by ``pip install`` (see ``setup.py``) and placed next
 to this file inside the installed package. Loading is lazy so that importing
-:mod:`patas` succeeds on machines without the compiled library (e.g. when
+:mod:`patminton` succeeds on machines without the compiled library (e.g. when
 building the documentation); the error is raised only when a
-:class:`patas.PAT` operator is instantiated.
+:class:`patminton.PAT` operator is instantiated.
 
-The environment variable ``PATAS_LIB`` overrides the library path, which is
+The environment variable ``PATMINTON_LIB`` overrides the library path, which is
 useful to point the package at a library built manually with ``make``.
 """
 
@@ -32,15 +32,15 @@ def get_lib():
     if _lib is not None:
         return _lib
 
-    path = os.environ.get("PATAS_LIB")
+    path = os.environ.get("PATMINTON_LIB")
     if path is None:
         candidate = Path(__file__).resolve().parent / "libpat_gpu.so"
         if not candidate.exists():
             raise OSError(
                 f"Compiled CUDA library not found at {candidate}. "
                 "Reinstall the package with the CUDA toolkit available "
-                "(pip install patas), or build it manually with nvcc and "
-                "point the PATAS_LIB environment variable at the .so file."
+                "(pip install patminton), or build it manually with nvcc and "
+                "point the PATMINTON_LIB environment variable at the .so file."
             )
         path = str(candidate)
 
