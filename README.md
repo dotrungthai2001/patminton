@@ -1,5 +1,7 @@
 # patminton — GPU-Accelerated 3D Photoacoustic Tomography
 
+[![Documentation](https://readthedocs.org/projects/patminton/badge/?version=latest)](https://patminton.readthedocs.io/)
+
 CUDA implementations of the forward and adjoint operators of 3D
 photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for
 iterative image reconstruction without storing the system matrix, plus
@@ -54,8 +56,11 @@ u, *_ = least_squares_CG(pat, s, M_inv=None, max_iter=50, lam=1e-4)
 
 ## Documentation
 
-The documentation (installation, quickstart, theory, transducer models,
-solvers) is built with MkDocs:
+**[patminton.readthedocs.io](https://patminton.readthedocs.io/)** — installation, quickstart, physical and
+mathematical model, transducer models, reconstruction algorithms and key
+parameters.
+
+To preview it locally:
 
 ```bash
 pip install -r docs/requirements.txt
