@@ -34,9 +34,9 @@ print(infos.shape)                # (nTrans, 12)
 ## Instantiate the operator
 
 ```python
-Nx = Ny = Nz = 100                # grid (voxels)
+Nx = Ny = Nz = 201                # grid (voxels)
 Lx = Ly = Lz = 5e-3               # grid half-extent (m)
-nT, dt, tStart = 512, 25e-9, 0.0  # time axis
+nT, dt, tStart = 1000, 25e-9, 0.0  # time axis
 
 pat = PAT(
     Nx, Ny, Nz, Lx, Ly, Lz,

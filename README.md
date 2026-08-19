@@ -7,8 +7,8 @@ photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for
 iterative image reconstruction without storing the system matrix, plus
 CGLS, L-BFGS-B, PGD and Chambolle-Pock TV solvers built on top of them.
 
-For a 100³ grid observed by 10⁴ transducer positions with 512 time samples,
-the dense system matrix would occupy 100³ × 10⁴ × 512 × 8 B ≈ 41 TB in double
+For a 201³ grid observed by 10⁴ transducer positions with 1000 time samples,
+the dense system matrix would occupy 201³ × 10⁴ × 1000 × 8 B ≈ 800 TB in double
 precision; `patminton` applies it and its adjoint on the fly on the GPU instead.
 
 ## Installation
@@ -41,12 +41,12 @@ infos = translation_rotation_system(
     grid_size=10e-3,
 )
 
-pat = PAT(100, 100, 100, 5e-3, 5e-3, 5e-3,
+pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
           nT=512, tStart=0.0, dt=25e-9, c=1540.0,
           mode='cylinder_lut', infos_transducers=infos)
 
-p = torch.zeros((100, 100, 100), dtype=torch.float64, device='cuda')
-p[50, 50, 50] = 1.0
+p = torch.zeros((201, 201, 201), dtype=torch.float64, device='cuda')
+p[100, 100, 100] = 1.0
 
 s = pat @ p                     # forward:  signals from initial pressure
 p_bp = pat.T @ s                # adjoint:  back-propagation
