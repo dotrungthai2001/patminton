@@ -6,6 +6,8 @@ copyright: Copyright &copy; 2026 the patminton authors
 
 theme:
   name: material
+  logo: assets/logo-mark.png
+  favicon: assets/favicon.png
   features:
     - navigation.sections
     - navigation.top
@@ -13,11 +15,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: white
+      accent: red
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: black
+      accent: red
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -35,6 +41,7 @@ nav:
 
 exclude_docs: |
   requirements.txt
+  assets/logo-source.jpg
 
 markdown_extensions:
   - admonition

@@ -1,6 +1,12 @@
-# patminton — GPU-Accelerated 3D Photoacoustic Tomography
+<p align="center">
+  <img src="docs/assets/logo.png" alt="PATminton — a Python toolbox for photoacoustic tomography" width="440">
+</p>
 
-[![Documentation](https://readthedocs.org/projects/patminton/badge/?version=latest)](https://patminton.readthedocs.io/)
+<p align="center">
+  <a href="https://patminton.readthedocs.io/"><img src="https://readthedocs.org/projects/patminton/badge/?version=latest" alt="Documentation"></a>
+</p>
+
+# patminton — GPU-Accelerated 3D Photoacoustic Tomography
 
 CUDA implementations of the forward and adjoint operators of 3D
 photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for

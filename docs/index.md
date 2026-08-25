@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="PATminton — a Python toolbox for photoacoustic tomography" width="440">
+</p>
+
 # patminton
 
 **GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography.**
