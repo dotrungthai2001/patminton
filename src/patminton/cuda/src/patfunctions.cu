@@ -273,13 +273,15 @@ __global__ void linkingPointsToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 	if ( (i < Nx) && (j < Ny) && (k < Nz) ) {
 		//getting info of grid point
 		double dx, dy, dz, x, y, z, xs, ys, zs, a ;
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
+
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
         // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double cvp = p[i*Ny*Nz + j*Nz + k] ;
 
@@ -329,13 +331,15 @@ __global__ void linkingPointsToGridT(int Nx, int Ny, int Nz, double Lx, double L
 	if ( (i < Nx) && (j < Ny) && (k < Nz) ) {
 		//getting info of grid point
 		double dx, dy, dz, x, y, z, xs, ys, zs, a ;
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
-		// the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
+        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
+
 		double value = 0.0 ;
 
 		double dist, t ;
@@ -927,14 +931,14 @@ template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int 
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double xl, yl, zl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
-        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
 
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
+        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double vp = p[i*Ny*Nz + j*Nz + k] ;
 
@@ -1209,13 +1213,14 @@ template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double xl, yl, zl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
         // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double value = 0.0 ;
 		double value_pixel = 0.0 ;
@@ -1725,14 +1730,14 @@ __global__ void linkingArcsToGrid(int Nx, int Ny, int Nz, double Lx, double Ly, 
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double xl, yl, zl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
-        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
 
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
+        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double vp = p[i*Ny*Nz + j*Nz + k] ;
 
@@ -1929,13 +1934,14 @@ __global__ void linkingArcsToGridT(int Nx, int Ny, int Nz, double Lx, double Ly,
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double xl, yl, zl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
         // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double value = 0.0 ;
 		double value_transducer = 0.0 ;
@@ -2113,13 +2119,14 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double x_cl, y_cl, z_cl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
         // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double vp = p[i*Ny*Nz + j*Nz + k] ;
 
@@ -2314,13 +2321,14 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 		double x, y, z ; // coordinates
 		double xs, ys, zs ; // coordinates centered in transducer system
 		double x_cl, y_cl, z_cl ; // coordinales of grid point in the transducer system
-		dx = (2*Lx) / (Nx-1) ;
-		dy = (2*Ly) / (Ny-1) ;
-		dz = (2*Lz) / (Nz-1) ;
+
+		dx = (2*Lx) / (Nx) ;
+		dy = (2*Ly) / (Ny) ;
+		dz = (2*Lz) / (Nz) ;
         // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + i*dx ;
-		y = -Ly + j*dy ;
-		z = -Lz + k*dz ;
+		x = -Lx + (i+0.5)*dx ;
+		y = -Ly + (j+0.5)*dy ;
+		z = -Lz + (k+0.5)*dz ;
 
 		double *s_transducer ;
 		double Rvp ;
