@@ -38,15 +38,14 @@ jobs:
         # One wheel per CUDA major version. Both carry the same tag
         # (py3-none-manylinux_2_28_x86_64), so only ONE can be uploaded to
         # PyPI; the other is kept as a build artifact. Keep "publish: true" on
-        # the CUDA version of the default PyTorch wheel on PyPI (CUDA 13 since
-        # torch 2.14), and the same name in the publish job's download pattern.
+        # the CUDA version most users' PyTorch install matches.
         include:
           - cuda: "12.8.1"
             image: nvidia/cuda:12.8.1-devel-rockylinux8
-            publish: false
+            publish: true
           - cuda: "13.0.0"
             image: nvidia/cuda:13.0.0-devel-rockylinux8
-            publish: true
+            publish: false
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +90,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: "{sdist,wheel-cuda13.0.0}"
+          pattern: "{sdist,wheel-cuda12.8.1}"
           merge-multiple: true
       - run: ls -lh dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
