@@ -91,9 +91,9 @@ def get_lib():
             raise OSError(
                 f"{exc}\n\nlibcufft could not be found. Install the CUDA toolkit, "
                 "or the cuFFT wheel matching the CUDA major version of patminton "
-                "(pip install patminton[cuda13] for the prebuilt wheel, "
-                "patminton[cuda12] for a build with CUDA 12), or add the "
-                "directory holding libcufft to LD_LIBRARY_PATH."
+                "(pip install patminton[cuda12] for libcufft.so.11, "
+                "patminton[cuda13] for libcufft.so.12), or add the directory "
+                "holding libcufft to LD_LIBRARY_PATH."
             ) from None
     # The constructors return an opaque pointer to the C++ PAT instance.
     for name in _CREATORS:

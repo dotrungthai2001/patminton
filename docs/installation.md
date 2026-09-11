@@ -18,14 +18,16 @@ pip install patminton
 ```
 
 On Linux x86-64 this installs a prebuilt wheel — no CUDA toolkit needed, only
-the driver. The wheel contains `libpat_gpu.so` compiled for compute
-capabilities 7.0 to 9.0 (12 MB), plus PTX for newer GPUs.
+the driver. The wheel is built with CUDA 12.8 and contains `libpat_gpu.so`
+compiled for compute capabilities 7.0 to 9.0 (12 MB), plus PTX for newer GPUs.
 
 `libpat_gpu.so` links dynamically against cuFFT (linking it statically costs
 270 MB, above the PyPI file size limit). cuFFT comes from the CUDA toolkit if
-one is installed, or from the `nvidia-cufft` wheel that PyTorch pulls in. When
-neither provides the right version, install it explicitly with the extra
-matching the CUDA major version the wheel was built with:
+one is installed, or from the `nvidia-cufft` wheel that PyTorch pulls in. The
+prebuilt wheel needs `libcufft.so.11`, which the default PyTorch wheel
+(CUDA 13) does not provide. When neither provides the right version, install
+it explicitly with the extra matching the CUDA major version the wheel was
+built with:
 
 ```bash
 pip install patminton[cuda12]     # libcufft.so.11

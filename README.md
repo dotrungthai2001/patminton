@@ -24,9 +24,10 @@ pip install patminton
 ```
 
 Requirements: a CUDA-capable NVIDIA GPU (compute capability ≥ 7.0) and
-Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel and needs no
-CUDA toolkit; if cuFFT is not already provided by a toolkit or by PyTorch,
-add the extra matching the build (`pip install patminton[cuda12]`).
+Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel built with
+CUDA 12.8 and needs no CUDA toolkit. It uses cuFFT from a CUDA 12 toolkit or
+a CUDA 12 build of PyTorch; otherwise, including with the default PyTorch
+wheel (CUDA 13), install it with `pip install patminton[cuda12]`.
 
 Installing from source instead requires the CUDA toolkit (`nvcc` ≥ 11 on
 PATH), which compiles the library for every supported architecture. To target
