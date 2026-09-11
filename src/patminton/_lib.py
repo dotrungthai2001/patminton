@@ -27,19 +27,16 @@ _lib = None
 
 
 def _cufft_search_dirs():
-    """Directories that may hold libcufft, most authoritative first."""
-    import importlib.util
+    """Directories outside the loader path that may hold libcufft."""
+    import sys
 
     dirs = []
-    for module in ("nvidia.cufft", "torch"):
-        try:
-            spec = importlib.util.find_spec(module)
-        except (ImportError, ValueError):
-            continue
-        if spec is None or not spec.submodule_search_locations:
-            continue
-        root = Path(spec.submodule_search_locations[0])
-        dirs += [root / "lib", root / "cufft" / "lib", root.parent / "cu13" / "lib"]
+    for entry in filter(None, sys.path):
+        site = Path(entry)
+        # pip CUDA wheels (nvidia/cufft for CUDA <= 12, nvidia/cu13 for
+        # CUDA 13), then libraries bundled with torch
+        dirs += [site / "nvidia" / "cufft" / "lib", site / "nvidia" / "cu13" / "lib",
+                 site / "torch" / "lib"]
     cuda_home = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
     if cuda_home:
         dirs.append(Path(cuda_home) / "lib64")
@@ -47,20 +44,15 @@ def _cufft_search_dirs():
 
 
 def _preload_cufft():
-    """Load libcufft into the global namespace so libpat_gpu.so can resolve it.
+    """Load every libcufft found by _cufft_search_dirs into the global namespace.
 
     libpat_gpu.so links dynamically against libcufft (static linking costs
-    270 MB). The system loader finds it when the CUDA toolkit is installed;
-    otherwise it usually sits in the nvidia-cufft-cu1x wheel that PyTorch
-    pulls in, which is not on the loader path. dlopen registers a library
-    under its soname, so loading every candidate by absolute path satisfies
-    whichever version libpat_gpu.so was built against.
+    270 MB). When the system loader cannot find it, it usually sits in the
+    cuFFT wheel that PyTorch pulls in, which is not on the loader path.
+    dlopen registers a library under its soname, and cuFFT symbols are
+    versioned (e.g. cufftPlanMany@libcufft.so.12), so loading every candidate
+    satisfies whichever version libpat_gpu.so was built against.
     """
-    try:
-        CDLL("libcufft.so.11", mode=RTLD_GLOBAL)
-        return
-    except OSError:
-        pass
     for directory in _cufft_search_dirs():
         for candidate in sorted(directory.glob("libcufft.so.*")):
             try:
@@ -87,18 +79,22 @@ def get_lib():
             )
         path = str(candidate)
 
-    _preload_cufft()
     try:
         lib = CDLL(path)
     except OSError as exc:
         if "libcufft" not in str(exc):
             raise
-        raise OSError(
-            f"{exc}\n\nlibcufft could not be found. Install the CUDA toolkit, "
-            "or the matching cuFFT wheel (pip install nvidia-cufft-cu12 for a "
-            "CUDA 12 build of patminton, nvidia-cufft-cu13 for CUDA 13), or "
-            "add the directory holding libcufft to LD_LIBRARY_PATH."
-        ) from None
+        _preload_cufft()
+        try:
+            lib = CDLL(path)
+        except OSError:
+            raise OSError(
+                f"{exc}\n\nlibcufft could not be found. Install the CUDA toolkit, "
+                "or the cuFFT wheel matching the CUDA major version of patminton "
+                "(pip install patminton[cuda13] for the prebuilt wheel, "
+                "patminton[cuda12] for a build with CUDA 12), or add the "
+                "directory holding libcufft to LD_LIBRARY_PATH."
+            ) from None
     # The constructors return an opaque pointer to the C++ PAT instance.
     for name in _CREATORS:
         getattr(lib, name).restype = POINTER(c_char)
