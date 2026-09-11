@@ -438,10 +438,10 @@ void PAT_cylinder_exact::bp_signal_u(double* d_p) {
  		d_p, d_su_);
 }
 //----------------------------------------------------------------------------
-// --- Implementations for PAT_cylinder_exact (Derived Class) ---
+// --- Implementations for PAT_cylinder_trapezoidal (Derived Class) ---
 //---------------------------------------------------------------------
 
-PAT_cylinder_farfield::PAT_cylinder_farfield( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+PAT_cylinder_trapezoidal::PAT_cylinder_trapezoidal( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
                                         int nT, double tStart, double dt, double c,
                                         int nTransducers, double *infos_transducers, // Host pointer
                                         int upsample, int steps_border, int steps,
@@ -453,12 +453,12 @@ PAT_cylinder_farfield::PAT_cylinder_farfield( int Nx, int Ny, int Nz, double Lx,
     {
     }
 
-PAT_cylinder_farfield::~PAT_cylinder_farfield()
+PAT_cylinder_trapezoidal::~PAT_cylinder_trapezoidal()
 {
 }
 
-void PAT_cylinder_farfield::compute_signal_u(double* d_p) {
-               linkingCylinderToGrid_Elliptic<EllipticMode::Far_Field><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
+void PAT_cylinder_trapezoidal::compute_signal_u(double* d_p) {
+               linkingCylinderToGrid_Elliptic<EllipticMode::Trapezoidal><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
                   	nTransducers_,
                     tStart_, nTu_, dtu_, c_, d_infos_transducers_,
             		nullptr,
@@ -470,8 +470,8 @@ void PAT_cylinder_farfield::compute_signal_u(double* d_p) {
             		d_p, d_su_);
 }
 
-void PAT_cylinder_farfield::bp_signal_u(double* d_p) {
-    linkingCylinderToGridT_Elliptic<EllipticMode::Far_Field><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
+void PAT_cylinder_trapezoidal::bp_signal_u(double* d_p) {
+    linkingCylinderToGridT_Elliptic<EllipticMode::Trapezoidal><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
        	nTransducers_,
         tStart_, nTu_, dtu_, c_, d_infos_transducers_,
  		nullptr,

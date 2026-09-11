@@ -17,14 +17,14 @@ extern "C" {
 			(bool)use_sparse_optimization) ;
 	}
 
-	PAT* createPAT_cylinder_far_field(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+	PAT* createPAT_cylinder_trapezoidal(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 		int nT, double tStart, double dt, double c,
 		int nTrans, double *infos_transducers,
 		int upsample, int steps_border, int steps, int blockSize,
 		double laser_pulse_variance, double* eir,
 		bool use_sparse_optimization) {
 
-		return new PAT_cylinder_farfield(Nx, Ny, Nz, Lx, Ly, Lz,
+		return new PAT_cylinder_trapezoidal(Nx, Ny, Nz, Lx, Ly, Lz,
 			nT, tStart, dt, c,
 			nTrans, infos_transducers,
 			upsample, steps_border, steps, blockSize,

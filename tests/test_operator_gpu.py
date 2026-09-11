@@ -71,7 +71,7 @@ def make_pat(mode, infos, **kwargs):
                      infos_transducers=infos, **common)
 
 
-ALL_MODES = ["cylinder_lut", "cylinder_exact", "cylinder_far_field",
+ALL_MODES = ["cylinder_lut", "cylinder_exact", "cylinder_trapezoidal",
              "cylinder_arcs", "cylinder_planes", "points"]
 
 

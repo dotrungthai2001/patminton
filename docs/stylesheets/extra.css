@@ -1,0 +1,44 @@
+/* Sidebar group titles: the site name and section labels in the left
+   sidebar, "Table of contents" in the right one. Edit the variables to
+   restyle all of them; the mobile drawer keeps the theme defaults.
+   The variables are set on body, where Material sets the color scheme, so
+   that the theme colors they reference follow the light/dark toggle. */
+body {
+  --pm-title-size: 0.8rem;                      /* sidebar links are 0.7rem */
+  --pm-title-color: var(--md-default-fg-color);
+  --pm-title-bg: var(--md-default-fg-color--lightest);
+  --pm-title-border: var(--md-accent-fg-color);  /* transparent to hide */
+  --pm-title-radius: 0.2rem;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-sidebar--primary .md-nav--primary > .md-nav__title,
+  .md-sidebar--primary .md-nav__item--section > .md-nav__link {
+    font-size: var(--pm-title-size);
+    color: var(--pm-title-color);
+    /* The site name and TOC titles are sticky: layer the tint over the page
+       background so that links scrolling underneath stay hidden. */
+    background: linear-gradient(var(--pm-title-bg), var(--pm-title-bg)),
+      var(--md-default-bg-color);
+    border-inline-start: 0.2rem solid var(--pm-title-border);
+    border-radius: var(--pm-title-radius);
+    padding: 0.3rem 0.6rem;
+  }
+
+  /* Align section boxes with the site name box: cancel the item padding. */
+  .md-sidebar--primary .md-nav__item--section > .md-nav__link {
+    margin-inline: -0.6rem;
+  }
+}
+
+@media screen and (min-width: 60em) {
+  .md-sidebar--secondary .md-nav--secondary > .md-nav__title {
+    font-size: var(--pm-title-size);
+    color: var(--pm-title-color);
+    background: linear-gradient(var(--pm-title-bg), var(--pm-title-bg)),
+      var(--md-default-bg-color);
+    border-inline-start: 0.2rem solid var(--pm-title-border);
+    border-radius: var(--pm-title-radius);
+    padding: 0.3rem 0.6rem;
+  }
+}

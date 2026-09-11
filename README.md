@@ -84,13 +84,7 @@ pytest              # CPU tests (no GPU needed)
 pytest -m gpu       # operator tests on a CUDA GPU
 ```
 
-## Reference
-
-The on-the-fly matrix-vector product strategy follows:
-
-> Lu Ding, Daniel Razansky, Xosé Luís Deán-Ben —
-> *"Model-based reconstruction of large three-dimensional optoacoustic
-> datasets"*, IEEE Transactions on Medical Imaging, 2020.
+## Citation
 
 If you use this package, please cite:
 

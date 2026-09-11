@@ -17,7 +17,7 @@ from pathlib import Path
 _CREATORS = (
     "createPAT_points",
     "createPAT_cylinder_exact",
-    "createPAT_cylinder_far_field",
+    "createPAT_cylinder_trapezoidal",
     "createPAT_cylinder_lut",
     "createPAT_cylinder_as_arcs",
     "createPAT_cylinder_as_planes",

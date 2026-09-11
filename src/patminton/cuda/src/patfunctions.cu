@@ -1096,7 +1096,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int 
                                     lut, sinphi0, k0, delta_sinphi0, delta_k0, eps, Nphi, Nk) ;
 						} else if constexpr (mode == EllipticMode::Exact) {
 						    I_next = compute_I_exact(alpha_next, beta_next,twoRD,r_next_sq - Dsq - Rsq) ; // boost::math (slow)
-						} else if constexpr (mode == EllipticMode::Far_Field) {
+						} else if constexpr (mode == EllipticMode::Trapezoidal) {
 				 	        double zalpha_next = fminf(fmaxf(sqrtf(twoRD*cos_theta_min + r_next_sq - Dsq - Rsq), Zmin), Zmax) ;
 							double zbeta_next = fminf(fmaxf(sqrtf(twoRD*cos_theta_max + r_next_sq - Dsq - Rsq), Zmin), Zmax) ;
 						    I_next = 0.5*(beta_next - alpha_next)*(zbeta_next + zalpha_next) ;
@@ -1176,7 +1176,7 @@ template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Exact>(int
 					const bool use_sparse_optimization,
 					double p[], double s[]) ;
 
-template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Far_Field>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Trapezoidal>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
                     int nTrans,
                     double tStart, int nT, double dt, double c,
                     const double* const infos_transducers,
@@ -1377,7 +1377,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int
                                     lut, sinphi0, k0, delta_sinphi0, delta_k0, eps, Nphi, Nk) ;
 						} else if constexpr (mode == EllipticMode::Exact) {
 						    I_next = compute_I_exact(alpha_next, beta_next,twoRD,r_next_sq - Dsq - Rsq) ; // boost::math (slow)
-						} else if constexpr (mode == EllipticMode::Far_Field) {
+						} else if constexpr (mode == EllipticMode::Trapezoidal) {
 				 	        double zalpha_next = fminf(fmaxf(sqrtf(twoRD*cos_theta_min + r_next_sq - Dsq - Rsq), Zmin), Zmax) ;
 							double zbeta_next = fminf(fmaxf(sqrtf(twoRD*cos_theta_max + r_next_sq - Dsq - Rsq), Zmin), Zmax) ;
 						    I_next = 0.5*(beta_next - alpha_next)*(zbeta_next + zalpha_next) ;
@@ -1448,7 +1448,7 @@ template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Exact>(in
 					int upsample, int steps_border, int steps,
 					double p[], double s[]) ;
 
-template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Far_Field>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Trapezoidal>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
                     int nTrans,
                     double tStart, int nT, double dt, double c,
                     const double* const infos_transducers,

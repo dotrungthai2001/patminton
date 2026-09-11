@@ -2,11 +2,10 @@
 
 The :class:`PAT` class wraps the CUDA library and exposes the on-the-fly
 matrix-vector products ``s = A p`` (forward) and ``p = A^T s`` (adjoint)
-without ever storing the system matrix ``A``. The strategy follows
-Ding, Razansky and Deán-Ben, *"Model-based reconstruction of large
-three-dimensional optoacoustic datasets"*, IEEE TMI, 2020.
+without ever storing the system matrix ``A``.
 """
 
+import warnings
 from ctypes import POINTER, c_bool, c_double, c_int, c_void_p
 
 import numpy as np
@@ -21,7 +20,7 @@ MODES = (
     "points",
     "cylinder_exact",
     "cylinder_lut",
-    "cylinder_far_field",
+    "cylinder_trapezoidal",
     "cylinder_arcs",
     "cylinder_planes",
 )
@@ -133,6 +132,14 @@ class PAT:
         Nk=1000,
         use_sparse_optimization=False,
     ):
+        if mode == "cylinder_far_field":
+            warnings.warn(
+                "mode='cylinder_far_field' is renamed 'cylinder_trapezoidal'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            mode = "cylinder_trapezoidal"
+
         self.instance = None
         self._lib = get_lib()
 
@@ -189,7 +196,7 @@ class PAT:
             in [
                 "cylinder_exact",
                 "cylinder_lut",
-                "cylinder_far_field",
+                "cylinder_trapezoidal",
                 "cylinder_arcs",
                 "cylinder_planes",
             ]
@@ -278,8 +285,8 @@ class PAT:
                     ptr_eir,
                     c_bool(use_sparse_optimization),
                 )
-            elif mode == "cylinder_far_field":
-                self.instance = self._lib.createPAT_cylinder_far_field(
+            elif mode == "cylinder_trapezoidal":
+                self.instance = self._lib.createPAT_cylinder_trapezoidal(
                     c_int(Nx),
                     c_int(Ny),
                     c_int(Nz),
@@ -349,7 +356,7 @@ class PAT:
         else:
             raise ValueError(
                 "mode should be 'points', 'cylinder_exact', 'cylinder_lut', "
-                "'cylinder_far_field', 'cylinder_arcs', 'cylinder_planes'"
+                "'cylinder_trapezoidal', 'cylinder_arcs', 'cylinder_planes'"
             )
 
     def __del__(self):

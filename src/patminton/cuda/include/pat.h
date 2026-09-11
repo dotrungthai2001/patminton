@@ -188,16 +188,16 @@ class PAT_cylinder_exact : public PAT_cylinder {
 
 } ;
 
-class PAT_cylinder_farfield : public PAT_cylinder {
+class PAT_cylinder_trapezoidal : public PAT_cylinder {
     public:
-       PAT_cylinder_farfield( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+       PAT_cylinder_trapezoidal( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
                             int nT, double tStart, double dt, double c,
                             int nTransducers, double *infos_transducers, // Host pointer
                             int upsample, int steps_border, int steps,
                             int blockSize, double laser_pulse_variance,
                             double* eir,
                             bool use_sparse_optimization);
-       ~PAT_cylinder_farfield() ;
+       ~PAT_cylinder_trapezoidal() ;
     protected:
         // implementation of the cylinder discretized in planes
    	    virtual void compute_signal_u(double* d_p) override ;

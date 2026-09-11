@@ -14,8 +14,7 @@ pressure distribution $p(x)$ — which reflects the optical absorption of the
 tissue — from the recorded time-domain signals $s(t)$.
 
 `patminton` implements the forward operator (pressure → signals) and its adjoint
-as **on-the-fly matrix-vector products** on the GPU, following the strategy
-of Ding, Razansky and Deán-Ben (IEEE TMI, 2020). The system matrix is never
+as **on-the-fly matrix-vector products** on the GPU. The system matrix is never
 stored: for a 201³ grid, 11 520 transducer positions and 1000 time samples it
 would occupy 201³ × 11 520 × 1000 × 8 B ≈ 750 TB in dense double precision.
 This makes iterative model-based reconstruction of large 3D volumes
@@ -73,9 +72,3 @@ If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
 > *"Implementations of photoacoustic tomography models"*, 2026.
-
-The matrix-vector product strategy follows:
-
-> Lu Ding, Daniel Razansky, Xosé Luís Deán-Ben — *"Model-based reconstruction
-> of large three-dimensional optoacoustic datasets"*, IEEE Transactions on
-> Medical Imaging, 2020.

@@ -68,12 +68,11 @@ interpolation error is below single precision, so the LUT **matches the
 accuracy of `cylinder_exact`** while running about 10× faster, and is also
 about 3× faster than `points`. **Recommended default.**
 
-### `cylinder_far_field`
+### `cylinder_trapezoidal`
 
-Despite its name, this mode makes no far-field assumption. It replaces the
-arc integral by the **trapezoidal rule**: when $\alpha_l$ and $\beta_l$ are
-close, the curve $u \mapsto \Psi(u, c\tau_l)$ is approximated by the chord
-joining its endpoints,
+This mode replaces the arc integral by the **trapezoidal rule**: when
+$\alpha_l$ and $\beta_l$ are close, the curve $u \mapsto \Psi(u, c\tau_l)$ is
+approximated by the chord joining its endpoints,
 
 $$
 I_l \approx \tfrac{1}{2}(\beta_l - \alpha_l)\bigl[\Psi(\alpha_l, c\tau_l)
@@ -120,7 +119,7 @@ speed is relative to `cylinder_lut`.
 | ---- | -------- | ----- | -------- |
 | `cylinder_lut` | matches `cylinder_exact` | 1× | **default** for reconstruction |
 | `cylinder_exact` | reference | ~10× slower | reference / validation |
-| `cylinder_far_field` (trapezoidal) | −0.3 dB | 1.2–1.5× faster | fastest; when the bias is acceptable |
+| `cylinder_trapezoidal` | −0.3 dB | 1.2–1.5× faster | fastest; when the bias is acceptable |
 | `cylinder_planes` (piecewise plane) | −0.7 dB | slower | tunable via `n_planes_per_cylinder` |
 | `points` | −1.2 dB | ~3× slower | arbitrary (non-cylindrical) geometries |
 | `cylinder_arcs` | not benchmarked | moderate | validation variant |
