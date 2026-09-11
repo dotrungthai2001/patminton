@@ -23,14 +23,15 @@ precision; `patminton` applies it and its adjoint on the fly on the GPU instead.
 pip install patminton
 ```
 
-Requirements: a CUDA-capable NVIDIA GPU (compute capability ≥ 7.0) and
-Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel and needs no
-CUDA toolkit; if cuFFT is not already provided by a toolkit or by PyTorch,
-add the extra matching the build (`pip install patminton[cuda12]`).
+Requirements: an NVIDIA GPU (compute capability ≥ 7.5, driver ≥ 580) and
+Python ≥ 3.9. On Linux x86-64 this installs a prebuilt CUDA 13 wheel and
+needs no CUDA toolkit; if cuFFT is not already provided by a toolkit or by
+PyTorch (e.g. with a CUDA 12 build of PyTorch), use
+`pip install patminton[cuda13]`.
 
 Installing from source instead requires the CUDA toolkit (`nvcc` ≥ 11 on
 PATH), which compiles the library for every supported architecture. To target
-a specific set of GPUs (e.g. V100 + A100 + RTX 30xx):
+a specific set of GPUs (e.g. V100 + A100 + RTX 30xx, with a CUDA 12 toolkit):
 
 ```bash
 PATMINTON_CUDA_ARCH="70;80;86" pip install --no-binary patminton patminton
