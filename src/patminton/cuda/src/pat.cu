@@ -37,10 +37,13 @@ PAT::PAT(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 	dtu_ = dt_ / upsampling_ ;
 	fftNtu_ = nTu_ / 2 + 1 ;  // Number of frequency components after FFT (half plus one due to symmetry).
 
-	// Compute spatial resolutions for the convolution kernel
-	dx_ = 2 * (Lx_) / (Nx_ - 1) ;
-	dy_ = 2 * (Ly_) / (Ny_ - 1) ;
-	dz_ = 2 * (Lz_) / (Nz_ - 1) ;
+	// Compute spatial resolutions for the convolution kernel.
+	// Must match the cell-centered voxel sampling used by the geometry
+	// kernels (x = -Lx + (i+0.5)*dx), otherwise the support of the radial
+	// basis function does not coincide with the voxel pitch.
+	dx_ = 2 * (Lx_) / Nx_ ;
+	dy_ = 2 * (Ly_) / Ny_ ;
+	dz_ = 2 * (Lz_) / Nz_ ;
 	scaleFFT_ = 1.0 / ((double)nTu_) ; // Scaling factor for inverse FFT to normalize results.
 
 	// cufftHandle plan ;

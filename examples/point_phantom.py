@@ -13,14 +13,14 @@ from patminton import (
 )
 
 # --- acquisition geometry -------------------------------------------------
-c = 1540.0   # speed of sound (m/s)
+c = 1500.0   # speed of sound in water (m/s)
 Fc = 5e6     # transducer central frequency (Hz)
 
 infos = translation_rotation_system(
     transducer_radius=25e-3,
     transducer_height=7.5e-3,
     transducer_width=0.250e-3,
-    transducer_pitch=0.289e-3,
+    transducer_pitch=0.298e-3,
     transducer_nbr_elements=64,
     transducer_wavelength=c / Fc,
     grid_size=5e-3,
@@ -30,7 +30,9 @@ print(f"{infos.shape[0]} transducer positions")
 # --- operator -------------------------------------------------------------
 Nx = Ny = Nz = 64
 Lx = Ly = Lz = 2.5e-3
-nT, dt, tStart = 512, 25e-9, 12e-6
+# Grid-to-surface distances span 21.7-36.8 mm here, i.e. 14.5-24.6 us at
+# c = 1500; the time axis is gated to that window (Fs = 62.5 MHz).
+nT, dt, tStart = 640, 16e-9, 14.4e-6
 
 pat = PAT(
     Nx, Ny, Nz, Lx, Ly, Lz,

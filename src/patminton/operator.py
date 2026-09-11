@@ -69,8 +69,8 @@ class PAT:
         n_arcs_per_cylinder: Number of arcs for ``mode='cylinder_arcs'``.
         n_planes_per_cylinder: Number of planes for ``mode='cylinder_planes'``.
         upsample: Time-axis oversampling factor used for the convolution with
-            the Green's function kernel. Larger is more accurate but uses more
-            GPU memory. Typical values: 11-51.
+            the system kernel of the radial basis function. Larger is more
+            accurate but uses more GPU memory. Typical values: 11-51.
         steps: Coarse time-step stride in the smooth regions of the
             integration loop. Defaults to ``upsample``.
         steps_border: Fine stride near the integration boundaries
@@ -78,12 +78,17 @@ class PAT:
             accuracy.
         blockSize: CUDA thread block edge size (3D blocks of
             ``blockSize**3`` threads).
-        laser_pulse_variance: Variance (s^2) of the Gaussian envelope
-            modeling the laser pulse. 0 disables it.
+        laser_pulse_variance: Standard deviation (s) of the Gaussian envelope
+            modeling the laser pulse. Despite the name, the value is used as
+            sigma, not sigma^2: the envelope is exp(-t^2 / (2 sigma^2)). The
+            default 5e-9 is a 5 ns pulse. 0 disables it.
         eir: 1D array with the Electronic Impulse Response, sampled at
             ``dt``, with the center of the EIR at index 0 (zero-phase
             convention). ``None`` disables the EIR convolution.
-        Nphi, Nk: Lookup-table resolution for ``mode='cylinder_lut'``.
+        Nphi, Nk: Lookup-table resolution for ``mode='cylinder_lut'``, along
+            the ``sin(theta)`` and elliptic-parameter axes respectively. Note
+            that the second axis holds the *parameter* (the ``m`` argument of
+            ``scipy.special.ellipeinc``), not the modulus ``k = sqrt(m)``.
         use_sparse_optimization: Enable the sparse-signal optimization in the
             CUDA kernels.
 
@@ -93,8 +98,8 @@ class PAT:
         OSError: If the compiled CUDA library cannot be found.
 
     Example:
-        >>> pat = PAT(100, 100, 100, 5e-3, 5e-3, 5e-3,
-        ...           nT=512, tStart=0.0, dt=25e-9, c=1540.0,
+        >>> pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
+        ...           nT=1024, tStart=12.5e-6, dt=16e-9, c=1500.0,
         ...           mode='cylinder_lut', infos_transducers=infos)
         >>> s = pat @ p
         >>> p_bp = pat.T @ s
@@ -225,8 +230,11 @@ class PAT:
                     c_bool(use_sparse_optimization),
                 )
             elif mode == "cylinder_lut":
-                # build LUT for elliptic integrals; the axes are clustered
-                # near the singularity (phi, k) -> (pi/2, 1)
+                # build LUT for elliptic integrals E and F, tabulated as
+                # functions of (sin(theta), nu) on [0,1]^2, where nu is the
+                # parameter (scipy's `m`), not the modulus. The axes are
+                # clustered near the singularity (sin(theta), nu) -> (1, 1),
+                # where F diverges logarithmically.
                 eps = 1e-16
 
                 x = np.linspace(0, 1, Nphi)
