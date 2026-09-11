@@ -1,0 +1,101 @@
+name: Publish to PyPI
+
+# Releases are cut by pushing a tag: git tag v0.1.0 && git push origin v0.1.0
+# Use workflow_dispatch to publish to TestPyPI first and check the result with
+#   pip install --index-url https://test.pypi.org/simple/ \
+#               --extra-index-url https://pypi.org/simple/ patminton
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Index to publish to"
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+jobs:
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  wheel:
+    name: Linux wheel (CUDA ${{ matrix.cuda }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # One wheel per CUDA major version. Both carry the same tag
+        # (py3-none-manylinux_2_28_x86_64), so only ONE can be uploaded to
+        # PyPI; the other is kept as a build artifact. Keep "publish: true" on
+        # the CUDA version most users' PyTorch install matches.
+        include:
+          - cuda: "12.8.1"
+            image: nvidia/cuda:12.8.1-devel-rockylinux8
+            publish: true
+          - cuda: "13.0.0"
+            image: nvidia/cuda:13.0.0-devel-rockylinux8
+            publish: false
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Rocky Linux 8 ships glibc 2.28, which is exactly the manylinux_2_28
+      # baseline, so the wheel runs on any distro at least that new.
+      - name: Install Python
+        run: dnf install -y python39 python39-pip && python3.9 -m pip install -q build
+
+      # No GPU on the runner, hence the explicit architecture list: Volta
+      # through Hopper for CUDA 12, Turing through Blackwell for CUDA 13
+      # (setup.py picks the default per nvcc version). The last architecture
+      # also gets PTX, so newer GPUs work after JIT compilation.
+      - name: Build wheel
+        env:
+          PATMINTON_PLAT_TAG: manylinux_2_28_x86_64
+        run: python3.9 -m build --wheel   # isolated, so setuptools >= 77 is used
+
+      - name: Check the wheel
+        run: |
+          python3.9 -m pip install -q auditwheel twine
+          python3.9 -m twine check dist/*.whl
+          # libcufft is deliberately left external (bundling it costs 270 MB,
+          # over the PyPI file size limit); it is resolved at runtime from the
+          # toolkit or the nvidia-cufft wheel. See patminton/_lib.py.
+          auditwheel show dist/*.whl || true
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-cuda${{ matrix.cuda }}
+          path: dist/*.whl
+
+  publish:
+    name: Upload to ${{ github.event.inputs.repository || 'pypi' }}
+    needs: [sdist, wheel]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # required for PyPI Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "{sdist,wheel-cuda12.8.1}"
+          merge-multiple: true
+      - run: ls -lh dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: >-
+            ${{ github.event.inputs.repository == 'testpypi'
+                && 'https://test.pypi.org/legacy/'
+                || 'https://upload.pypi.org/legacy/' }}

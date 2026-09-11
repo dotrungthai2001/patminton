@@ -11,7 +11,7 @@ useful to point the package at a library built manually with ``make``.
 """
 
 import os
-from ctypes import CDLL, POINTER, c_char
+from ctypes import CDLL, POINTER, RTLD_GLOBAL, c_char
 from pathlib import Path
 
 _CREATORS = (
@@ -24,6 +24,49 @@ _CREATORS = (
 )
 
 _lib = None
+
+
+def _cufft_search_dirs():
+    """Directories that may hold libcufft, most authoritative first."""
+    import importlib.util
+
+    dirs = []
+    for module in ("nvidia.cufft", "torch"):
+        try:
+            spec = importlib.util.find_spec(module)
+        except (ImportError, ValueError):
+            continue
+        if spec is None or not spec.submodule_search_locations:
+            continue
+        root = Path(spec.submodule_search_locations[0])
+        dirs += [root / "lib", root / "cufft" / "lib", root.parent / "cu13" / "lib"]
+    cuda_home = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
+    if cuda_home:
+        dirs.append(Path(cuda_home) / "lib64")
+    return dirs
+
+
+def _preload_cufft():
+    """Load libcufft into the global namespace so libpat_gpu.so can resolve it.
+
+    libpat_gpu.so links dynamically against libcufft (static linking costs
+    270 MB). The system loader finds it when the CUDA toolkit is installed;
+    otherwise it usually sits in the nvidia-cufft-cu1x wheel that PyTorch
+    pulls in, which is not on the loader path. dlopen registers a library
+    under its soname, so loading every candidate by absolute path satisfies
+    whichever version libpat_gpu.so was built against.
+    """
+    try:
+        CDLL("libcufft.so.11", mode=RTLD_GLOBAL)
+        return
+    except OSError:
+        pass
+    for directory in _cufft_search_dirs():
+        for candidate in sorted(directory.glob("libcufft.so.*")):
+            try:
+                CDLL(str(candidate), mode=RTLD_GLOBAL)
+            except OSError:
+                pass
 
 
 def get_lib():
@@ -44,7 +87,18 @@ def get_lib():
             )
         path = str(candidate)
 
-    lib = CDLL(path)
+    _preload_cufft()
+    try:
+        lib = CDLL(path)
+    except OSError as exc:
+        if "libcufft" not in str(exc):
+            raise
+        raise OSError(
+            f"{exc}\n\nlibcufft could not be found. Install the CUDA toolkit, "
+            "or the matching cuFFT wheel (pip install nvidia-cufft-cu12 for a "
+            "CUDA 12 build of patminton, nvidia-cufft-cu13 for CUDA 13), or "
+            "add the directory holding libcufft to LD_LIBRARY_PATH."
+        ) from None
     # The constructors return an opaque pointer to the C++ PAT instance.
     for name in _CREATORS:
         getattr(lib, name).restype = POINTER(c_char)

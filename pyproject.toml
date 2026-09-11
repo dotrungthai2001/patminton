@@ -22,7 +22,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Environment :: GPU :: NVIDIA CUDA",
     "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
     "numpy",
@@ -35,6 +37,16 @@ Documentation = "https://patminton.readthedocs.io/"
 Source = "https://github.com/dotrungthai2001/patminton"
 
 [project.optional-dependencies]
+# libpat_gpu.so links dynamically against libcufft. The CUDA toolkit provides
+# it; these extras pull it from PyPI instead, for installs from a wheel on a
+# machine without the toolkit. Pick the extra matching the CUDA major version
+# the wheel was built with (reported by "pip show patminton").
+cuda12 = [
+    "nvidia-cufft-cu12",
+]
+cuda13 = [
+    "nvidia-cufft>=12",
+]
 docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5,<10",
