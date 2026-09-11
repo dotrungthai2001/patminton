@@ -13,15 +13,13 @@ theme:
     - navigation.top
     - content.code.copy
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
+    - scheme: default
       primary: white
       accent: red
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
+    - scheme: slate
       primary: black
       accent: red
       toggle:

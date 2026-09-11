@@ -16,14 +16,14 @@ import numpy as np
 import torch
 from patminton import PAT, translation_rotation_system
 
-c = 1540.0        # speed of sound (m/s)
+c = 1500.0        # speed of sound in water (m/s)
 Fc = 5e6          # transducer central frequency (Hz)
 
 infos = translation_rotation_system(
-    transducer_radius=25e-3,      # cylinder radius (m)
-    transducer_height=7.5e-3,     # element height, arc direction (m)
-    transducer_width=0.250e-3,    # element width, axis direction (m)
-    transducer_pitch=0.289e-3,    # element spacing (m)
+    transducer_radius=25e-3,      # cylinder radius / focal distance (m)
+    transducer_height=7.5e-3,     # elevation aperture, arc direction (m)
+    transducer_width=0.250e-3,    # element width, along the cylinder axis (m)
+    transducer_pitch=0.298e-3,    # element spacing (m)
     transducer_nbr_elements=64,   # elements per probe position
     transducer_wavelength=c / Fc,
     grid_size=10e-3,              # extent to cover with translations (m)
@@ -33,10 +33,17 @@ print(infos.shape)                # (nTrans, 12)
 
 ## Instantiate the operator
 
+The time axis must cover the window during which wavefronts emitted from the
+grid can reach the transducer surfaces. For this geometry the grid-to-surface
+distances span 18.9–43.0 mm, i.e. 12.6–28.6 µs at `c = 1500`; sampling at
+62.5 MHz (`dt = 16e-9`) and gating to that window gives ≈ 1000 samples per
+element. Starting at `tStart = 0` instead would spend most of the window on
+silence and truncate the tail.
+
 ```python
-Nx = Ny = Nz = 201                # grid (voxels)
-Lx = Ly = Lz = 5e-3               # grid half-extent (m)
-nT, dt, tStart = 1000, 25e-9, 0.0  # time axis
+Nx = Ny = Nz = 201                    # grid (voxels)
+Lx = Ly = Lz = 5e-3                   # grid half-extent (m)
+nT, dt, tStart = 1024, 16e-9, 12.5e-6  # time axis (Fs = 62.5 MHz)
 
 pat = PAT(
     Nx, Ny, Nz, Lx, Ly, Lz,

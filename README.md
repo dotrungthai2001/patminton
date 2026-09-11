@@ -13,25 +13,27 @@ photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for
 iterative image reconstruction without storing the system matrix, plus
 CGLS, L-BFGS-B, PGD and Chambolle-Pock TV solvers built on top of them.
 
-For a 201³ grid observed by 10⁴ transducer positions with 1000 time samples,
-the dense system matrix would occupy 201³ × 10⁴ × 1000 × 8 B ≈ 800 TB in double
+For a 201³ grid observed by 11 520 transducer positions with 1000 time samples,
+the dense system matrix would occupy 201³ × 11 520 × 1000 × 8 B ≈ 750 TB in double
 precision; `patminton` applies it and its adjoint on the fly on the GPU instead.
 
 ## Installation
 
-Requirements: a CUDA-capable NVIDIA GPU, the CUDA toolkit (`nvcc` ≥ 11 on
-PATH) and Python ≥ 3.9. Then:
-
 ```bash
-pip install .
+pip install patminton
 ```
 
-`pip` compiles the CUDA library for the GPU of the build machine
-(`-arch=native`). To target other architectures (e.g. building on a cluster
-login node for V100 + A100 compute nodes):
+Requirements: a CUDA-capable NVIDIA GPU (compute capability ≥ 7.0) and
+Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel and needs no
+CUDA toolkit; if cuFFT is not already provided by a toolkit or by PyTorch,
+add the extra matching the build (`pip install patminton[cuda12]`).
+
+Installing from source instead requires the CUDA toolkit (`nvcc` ≥ 11 on
+PATH), which compiles the library for every supported architecture. To target
+a specific set of GPUs (e.g. V100 + A100 + RTX 30xx):
 
 ```bash
-PATMINTON_CUDA_ARCH="70;80;86" pip install .
+PATMINTON_CUDA_ARCH="70;80;86" pip install --no-binary patminton patminton
 ```
 
 ## Quick example
@@ -42,13 +44,13 @@ from patminton import PAT, translation_rotation_system, least_squares_CG
 
 infos = translation_rotation_system(
     transducer_radius=25e-3, transducer_height=7.5e-3,
-    transducer_width=0.250e-3, transducer_pitch=0.289e-3,
-    transducer_nbr_elements=64, transducer_wavelength=1540/5e6,
+    transducer_width=0.250e-3, transducer_pitch=0.298e-3,
+    transducer_nbr_elements=64, transducer_wavelength=1500/5e6,
     grid_size=10e-3,
 )
 
 pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
-          nT=512, tStart=0.0, dt=25e-9, c=1540.0,
+          nT=1024, tStart=12.5e-6, dt=16e-9, c=1500.0,
           mode='cylinder_lut', infos_transducers=infos)
 
 p = torch.zeros((201, 201, 201), dtype=torch.float64, device='cuda')

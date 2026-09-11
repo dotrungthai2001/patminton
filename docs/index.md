@@ -16,20 +16,22 @@ tissue — from the recorded time-domain signals $s(t)$.
 `patminton` implements the forward operator (pressure → signals) and its adjoint
 as **on-the-fly matrix-vector products** on the GPU, following the strategy
 of Ding, Razansky and Deán-Ben (IEEE TMI, 2020). The system matrix is never
-stored: for a 201³ grid, 10⁴ transducer positions and 1000 time samples it
-would occupy 201³ × 10⁴ × 1000 × 8 B ≈ 800 TB in dense double precision.
+stored: for a 201³ grid, 11 520 transducer positions and 1000 time samples it
+would occupy 201³ × 11 520 × 1000 × 8 B ≈ 750 TB in dense double precision.
 This makes iterative model-based reconstruction of large 3D volumes
 tractable on a single GPU.
 
 ## Features
 
-- **Six transducer models** for cylindrical elements — from exact surface
-  integrals via elliptic integrals (evaluated on-device with Carlson
-  symmetric forms) to fast lookup-table and far-field approximations. See
-  [Transducer models](transducer-models.md).
-- **Forward model with instrument response**: convolution with the acoustic
-  Green's function kernel, the laser pulse envelope and the measured
-  Electronic Impulse Response (EIR), computed with batched cuFFT.
+- **Six transducer models**: a generic point-quadrature model that applies to
+  any surface, plus five models for cylindrically focused elements — from the
+  exact surface integral via elliptic integrals (evaluated on-device with
+  Carlson symmetric forms) to lookup-table, trapezoidal and piecewise-planar
+  approximations. See [Transducer models](transducer-models.md).
+- **Forward model with instrument response**: convolution with the system
+  kernel of the radial basis function used to discretize the initial pressure,
+  the laser pulse envelope and the measured Electronic Impulse Response (EIR),
+  computed with batched cuFFT.
 - **Adjoint consistency**: the adjoint mirrors the forward pass exactly
   (verified by dot-product tests), as required by iterative solvers.
 - **Iterative solvers**: CGLS, L-BFGS-B (non-negativity constraint), projected
@@ -46,13 +48,13 @@ from patminton import PAT, translation_rotation_system, least_squares_CG
 
 infos = translation_rotation_system(
     transducer_radius=25e-3, transducer_height=7.5e-3,
-    transducer_width=0.250e-3, transducer_pitch=0.289e-3,
-    transducer_nbr_elements=64, transducer_wavelength=1540/5e6,
+    transducer_width=0.250e-3, transducer_pitch=0.298e-3,
+    transducer_nbr_elements=64, transducer_wavelength=1500/5e6,
     grid_size=10e-3,
 )
 
 pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
-          nT=1000, tStart=0.0, dt=25e-9, c=1540.0,
+          nT=1024, tStart=12.5e-6, dt=16e-9, c=1500.0,
           mode='cylinder_lut', infos_transducers=infos)
 
 p = torch.zeros((201, 201, 201), dtype=torch.float64, device='cuda')
