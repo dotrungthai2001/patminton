@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "patminton"
-version = "0.1.0"
-description = "GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography"
+version = "0.1.1"
+description = "Scalable GPU forward and adjoint operators for 3D photoacoustic tomography that model the transducer spatial impulse response"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"

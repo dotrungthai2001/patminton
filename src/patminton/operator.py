@@ -95,7 +95,7 @@ class PAT:
         OSError: If the compiled CUDA library cannot be found.
 
     Example:
-        >>> pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
+        >>> pat = PAT(200, 200, 200, 5e-3, 5e-3, 5e-3,
         ...           nT=1024, tStart=12.5e-6, dt=16e-9, c=1500.0,
         ...           mode='cylinder_lut', infos_transducers=infos)
         >>> s = pat @ p

@@ -18,8 +18,8 @@ tissue — from the recorded time-domain signals $s(t)$.
 
 `patminton` implements the forward operator (pressure → signals) and its adjoint
 as **on-the-fly matrix-vector products** on the GPU. The system matrix is never
-stored: for a 201³ grid, 11 520 transducer positions and 1000 time samples it
-would occupy 201³ × 11 520 × 1000 × 8 B ≈ 750 TB in dense double precision.
+stored: for a 200³ grid, 11 520 transducer positions and 1000 time samples it
+would occupy 200³ × 11 520 × 1000 × 8 B ≈ 737 TB in dense double precision.
 This makes iterative model-based reconstruction of large 3D volumes
 tractable on a single GPU.
 
@@ -55,11 +55,11 @@ infos = translation_rotation_system(
     grid_size=10e-3,
 )
 
-pat = PAT(201, 201, 201, 5e-3, 5e-3, 5e-3,
+pat = PAT(200, 200, 200, 5e-3, 5e-3, 5e-3,
           nT=1024, tStart=12.5e-6, dt=16e-9, c=1500.0,
           mode='cylinder_lut', infos_transducers=infos)
 
-p = torch.zeros((201, 201, 201), dtype=torch.float64, device='cuda')
+p = torch.zeros((200, 200, 200), dtype=torch.float64, device='cuda')
 p[100, 100, 100] = 1.0
 
 s = pat @ p          # forward

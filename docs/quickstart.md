@@ -41,7 +41,7 @@ element. Starting at `tStart = 0` instead would spend most of the window on
 silence and truncate the tail.
 
 ```python
-Nx = Ny = Nz = 201                    # grid (voxels)
+Nx = Ny = Nz = 200                    # grid (voxels)
 Lx = Ly = Lz = 5e-3                   # grid half-extent (m)
 nT, dt, tStart = 1024, 16e-9, 12.5e-6  # time axis (Fs = 62.5 MHz)
 
