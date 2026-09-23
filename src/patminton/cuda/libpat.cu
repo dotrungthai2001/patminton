@@ -66,34 +66,16 @@ extern "C" {
 			(bool)use_sparse_optimization);
 	}
 
-	PAT* createPAT_cylinder_as_arcs(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+	PAT* createPAT_plane(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 		int nT, double tStart, double dt, double c,
 		int nTrans, double *infos_transducers,
-		int n_arcs_per_cylinder,
 		int upsample, int steps_border, int steps, int blockSize,
-	    double laser_pulse_variance, double* eir,
+		double laser_pulse_variance, double* eir,
 		bool use_sparse_optimization) {
 
-		return new PAT_cylinder_arcs(Nx, Ny, Nz, Lx, Ly, Lz,
+		return new PAT_plane(Nx, Ny, Nz, Lx, Ly, Lz,
 			nT, tStart, dt, c,
 			nTrans, infos_transducers,
-			n_arcs_per_cylinder,
-			upsample, steps_border, steps, blockSize, laser_pulse_variance, eir,
-			(bool)use_sparse_optimization);
-	}
-
-	PAT* createPAT_cylinder_as_planes(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-		int nT, double tStart, double dt, double c,
-		int nTrans, double *infos_transducers,
-		int n_planes_per_cylinder,
-		int upsample, int steps_border, int steps, int blockSize,
-	    double laser_pulse_variance, double* eir,
-		bool use_sparse_optimization) {
-
-		return new PAT_cylinder_planes(Nx, Ny, Nz, Lx, Ly, Lz,
-			nT, tStart, dt, c,
-			nTrans, infos_transducers,
-			n_planes_per_cylinder,
 			upsample, steps_border, steps, blockSize, laser_pulse_variance, eir,
 			(bool)use_sparse_optimization);
 	}

@@ -310,87 +310,40 @@ PAT_cylinder::~PAT_cylinder() {
 }
 
 //----------------------------------------------------------------------------
-// --- implementations for pat_cylinder_arcs (derived class) ---
+// --- Implementations for PAT_plane (Derived Class) ---
 //---------------------------------------------------------------------
 
-PAT_cylinder_arcs::PAT_cylinder_arcs(   int nx, int ny, int nz, double lx, double ly, double lz,
-                                        int nt, double tstart, double dt, double c,
-                                        int ntransducers, double *infos_transducers, // host pointer
-                                        int n_arcs_per_cylinder,
-                                        int upsample, int steps_border, int steps,
-                                        int blockSize, double laser_pulse_variance,
-                                        double* eir,
-                                        bool use_sparse_optimization)
-    : PAT_cylinder(nx, ny, nz, lx, ly, lz, nt, tstart, dt, c, ntransducers, infos_transducers,
-        upsample, steps_border, steps, blockSize, laser_pulse_variance, eir, use_sparse_optimization),
-    n_arcs_per_cylinder_(n_arcs_per_cylinder) {
+PAT_plane::PAT_plane( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+                      int nT, double tStart, double dt, double c,
+                      int nTransducers, double *infos_transducers, // Host pointer
+                      int upsample, int steps_border, int steps,
+                      int blockSize, double laser_pulse_variance,
+                      double* eir,
+                      bool use_sparse_optimization)
+    : PAT_cylinder(Nx, Ny, Nz, Lx, Ly, Lz, nT, tStart, dt, c, nTransducers, infos_transducers,
+        upsample, steps_border, steps, blockSize, laser_pulse_variance, eir, use_sparse_optimization) {
 
     }
 
-PAT_cylinder_arcs::~PAT_cylinder_arcs()
+PAT_plane::~PAT_plane()
 {
 }
 
-
-
-
-void PAT_cylinder_arcs::compute_signal_u(double* d_p) {
-      		linkingArcsToGrid<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
+void PAT_plane::compute_signal_u(double* d_p) {
+	linkingPlanesToGrid<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
 								nTransducers_,
 								tStart_, nTu_, dtu_, c_, d_infos_transducers_,
-								n_arcs_per_cylinder_,
 								upsampling_,steps_border_, steps_,
 								use_sparse_optimization_,
 								d_p, d_su_);
 }
 
-void PAT_cylinder_arcs::bp_signal_u(double* d_p) {
-    	linkingArcsToGridT<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
+void PAT_plane::bp_signal_u(double* d_p) {
+	linkingPlanesToGridT<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
 								nTransducers_,
 								tStart_, nTu_, dtu_, c_, d_infos_transducers_,
-								n_arcs_per_cylinder_,
 								upsampling_,steps_border_, steps_,
 								d_p, d_su_);
-}
-//----------------------------------------------------------------------------
-// --- Implementations for PAT_cylinder_planes (Derived Class) ---
-//---------------------------------------------------------------------
-
-PAT_cylinder_planes::PAT_cylinder_planes(   int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-                                        int nT, double tStart, double dt, double c,
-                                        int nTransducers, double *infos_transducers, // Host pointer
-                                        int n_planes_per_cylinder,
-                                        int upsample, int steps_border, int steps,
-                                        int blockSize, double laser_pulse_variance,
-                                        double* eir,
-                                        bool use_sparse_optimization)
-    : PAT_cylinder(Nx, Ny, Nz, Lx, Ly, Lz, nT, tStart, dt, c, nTransducers, infos_transducers,
-        upsample, steps_border, steps, blockSize, laser_pulse_variance, eir, use_sparse_optimization),
-    n_planes_per_cylinder_(n_planes_per_cylinder) {
-
-    }
-
-PAT_cylinder_planes::~PAT_cylinder_planes()
-{
-}
-
-void PAT_cylinder_planes::compute_signal_u(double* d_p) {
-                linkingPlanesToGrid<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
-    								nTransducers_,
-    								tStart_, nTu_, dtu_, c_, d_infos_transducers_,
-    								n_planes_per_cylinder_,
-    								upsampling_,steps_border_, steps_,
-    								use_sparse_optimization_,
-    								d_p, d_su_);
-}
-
-void PAT_cylinder_planes::bp_signal_u(double* d_p) {
-     	linkingPlanesToGridT<<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
-																			nTransducers_,
-																			tStart_, nTu_, dtu_, c_, d_infos_transducers_,
-																			n_planes_per_cylinder_,
-																			upsampling_,steps_border_, steps_,
-																			d_p, d_su_);
 }
 
 //----------------------------------------------------------------------------

@@ -1,20 +1,32 @@
 """Transducer array geometry.
 
-A cylindrical transducer element is described by 12 parameters (one row of the
-``infos`` array):
+Each element is described by 12 parameters (one row of the ``infos``
+array). The first nine have the same form for both element shapes:
 
-- ``[0:3]`` center position ``(xc, yc, zc)`` in meters,
-- ``[3:6]`` unit vector ``e1``, the cylinder axis,
-- ``[6:9]`` unit vector ``e2``, orthogonal to ``e1``, pointing through the
-  middle of the arc (toward the imaging center),
+- ``[0:3]`` center position ``c = (xc, yc, zc)`` in meters,
+- ``[3:6]`` unit vector ``e1``,
+- ``[6:9]`` unit vector ``e2``, orthogonal to ``e1``.
+
+Cylindrically focused element (``cylinder_*`` modes): ``c`` is the center
+of the cylinder axis, ``e1`` the axis, and ``e2`` points from the axis
+through the middle of the arc;
+
 - ``[9]`` cylinder radius ``R`` (m),
 - ``[10]`` half-aperture angle ``theta_max`` (rad): the arc spans
   ``[-theta_max, theta_max]`` about ``e2``,
-- ``[11]`` half-height ``h`` of the element (m).
+- ``[11]`` half-height ``h`` of the element along ``e1`` (m).
+
+Flat rectangular element (``mode='plane'``): ``c`` is the center of the
+face, ``e1`` lies in the face and ``e2`` is the face normal;
+
+- ``[9]`` unused,
+- ``[10]`` half-extent ``w`` across ``e1``, along ``e3 = e1 x e2`` (m),
+- ``[11]`` half-extent ``h`` along ``e1`` (m).
 
 :func:`translation_rotation_system` generates the full set of element
-positions for a rotating and translating linear probe.
-:func:`discretize_cylindrical_transducers` samples each element surface into
+positions for a rotating and translating linear probe, with either element
+shape. :func:`discretize_cylindrical_transducers` and
+:func:`discretize_planar_transducers` sample the element surfaces into
 points, as required by the ``points`` mode of :class:`patminton.PAT`.
 """
 
@@ -30,18 +42,20 @@ def translation_rotation_system(transducer_radius: float,
                                 transducer_wavelength: float,
                                 grid_size: float,
                                 rotation_axis=np.array([0, 1, 0]),
-                                translation_axis=np.array([1, 0, 0])
+                                translation_axis=np.array([1, 0, 0]),
+                                element="cylinder",
                                 ):
     """Generate the element positions of a rotation + translation scan.
 
-    The probe is a linear array of ``transducer_nbr_elements`` cylindrical
-    elements (pitch ``transducer_pitch`` along the y-axis). It is rotated
-    around ``rotation_axis`` and translated along ``translation_axis`` to
-    cover the imaged volume; the angular positions follow a Hamming
-    apodization profile.
+    The probe is a linear array of ``transducer_nbr_elements`` elements
+    (pitch ``transducer_pitch`` along the y-axis). It is rotated around
+    ``rotation_axis`` and translated along ``translation_axis`` to cover the
+    imaged volume; the angular positions follow a Hamming apodization
+    profile.
 
     Args:
-        transducer_radius: Radius of the cylindrical elements (m).
+        transducer_radius: Radius of the cylindrical elements (m). Also sets
+            the scan geometry for flat elements.
         transducer_height: Height of the elements in the arc direction (m).
         transducer_width: Width of the elements along the cylinder axis (m).
         transducer_pitch: Center-to-center distance between elements (m).
@@ -50,6 +64,10 @@ def translation_rotation_system(transducer_radius: float,
         grid_size: Extent of the simulation grid to cover with translations (m).
         rotation_axis: Unit vector of the rotation axis.
         translation_axis: Unit vector of the translation direction.
+        element: ``"cylinder"`` for cylindrically focused elements (rows for
+            the ``cylinder_*`` modes), or ``"plane"`` for flat elements of
+            the same size whose face lies at the middle of the arc (rows for
+            ``mode='plane'``).
 
     Returns:
         ``(nTrans, 12)`` array of transducer descriptions in the format
@@ -57,10 +75,12 @@ def translation_rotation_system(transducer_radius: float,
 
     Raises:
         ValueError: If ``rotation_axis`` or ``translation_axis`` is not of
-            unit norm.
+            unit norm, or ``element`` is unknown.
     """
     if not np.isclose(np.sum(rotation_axis**2), 1.) or not np.isclose(np.sum(translation_axis**2), 1.):
         raise ValueError("Axis of rotation and translation should be of unit norm")
+    if element not in ("cylinder", "plane"):
+        raise ValueError("element should be 'cylinder' or 'plane'")
 
     # motor configuration
     rotMotor_alpha = np.pi/4
@@ -114,8 +134,13 @@ def translation_rotation_system(transducer_radius: float,
     infos[:, 3:6] = np.stack(list_e1)
     infos[:, 6:9] = np.stack(list_e2)
 
-    infos[:, 9] = transducer_radius
-    infos[:, 10] = theta_max
+    if element == "plane":
+        # the face lies at the middle of the arc, c + R e2
+        infos[:, :3] += transducer_radius * infos[:, 6:9]
+        infos[:, 10] = transducer_height / 2
+    else:
+        infos[:, 9] = transducer_radius
+        infos[:, 10] = theta_max
     infos[:, 11] = transducer_width / 2
 
     return infos
@@ -182,5 +207,41 @@ def discretize_cylindrical_transducers(infos, number_points_height, number_point
 
         points[i] = trans_points
         area[i, :] = a.reshape(-1)
+
+    return points, area
+
+
+def discretize_planar_transducers(infos, number_points_height, number_points_width):
+    """Sample the face of each flat element into points.
+
+    Planar counterpart of :func:`discretize_cylindrical_transducers`, for
+    ``mode='points'`` on the elements of ``mode='plane'``.
+
+    Args:
+        infos: ``(nTrans, 12)`` flat element descriptions (see module
+            docstring).
+        number_points_height: Number of samples across ``e1``.
+        number_points_width: Number of samples along ``e1``.
+
+    Returns:
+        Tuple ``(points, area)`` with the same shapes as
+        :func:`discretize_cylindrical_transducers`.
+    """
+    points = np.zeros((infos.shape[0], number_points_width*number_points_height, 3))
+    area = np.zeros((infos.shape[0], number_points_width*number_points_height))
+
+    for i in range(infos.shape[0]):
+        c = infos[i, 0:3]
+        e1 = infos[i, 3:6]
+        e3 = np.cross(e1, infos[i, 6:9])
+        w = infos[i, 10]
+        h = infos[i, 11]
+
+        u = np.linspace(-w, w, number_points_height+1)
+        t = np.linspace(-h, h, number_points_width+1)
+        U, T = np.meshgrid(0.5*(u[1:] + u[:-1]), 0.5*(t[1:] + t[:-1]))
+
+        points[i] = c[None] + U.reshape(-1, 1) * e3[None] + T.reshape(-1, 1) * e1[None]
+        area[i, :] = (u[1] - u[0]) * (t[1] - t[0])
 
     return points, area

@@ -13,7 +13,7 @@ In photoacoustic tomography (PAT), a short laser pulse illuminates biological
 tissue. The absorbed optical energy causes a rapid thermoelastic expansion
 that generates a broadband ultrasonic wave, recorded at the surface by an
 array of ultrasound transducers. The goal is to recover the 3D initial
-pressure distribution $p(x)$ — which reflects the optical absorption of the
+pressure distribution $p_0(x)$ — which reflects the optical absorption of the
 tissue — from the recorded time-domain signals $s(t)$.
 
 `patminton` implements the forward operator (pressure → signals) and its adjoint
@@ -25,11 +25,11 @@ tractable on a single GPU.
 
 ## Features
 
-- **Six transducer models**: a generic point-quadrature model that applies to
-  any surface, plus five models for cylindrically focused elements — from the
-  exact surface integral via elliptic integrals (evaluated on-device with
-  Carlson symmetric forms) to lookup-table, trapezoidal and piecewise-planar
-  approximations. See [Transducer models](transducer-models.md).
+- **Transducer models**: closed-form surface integrals for flat rectangular
+  elements and for cylindrically focused elements — the latter exact via
+  elliptic integrals (evaluated on-device with Carlson symmetric forms), with
+  a lookup table, or with the trapezoidal rule — plus point quadrature for any
+  other surface. See [Transducer models](transducer-models.md).
 - **Forward model with instrument response**: convolution with the system
   kernel of the radial basis function used to discretize the initial pressure,
   the laser pulse envelope and the measured Electronic Impulse Response (EIR),

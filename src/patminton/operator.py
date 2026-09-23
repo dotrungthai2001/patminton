@@ -18,11 +18,10 @@ c_double_p = POINTER(c_double)
 
 MODES = (
     "points",
+    "plane",
     "cylinder_exact",
     "cylinder_lut",
     "cylinder_trapezoidal",
-    "cylinder_arcs",
-    "cylinder_planes",
 )
 """Available transducer models (values of the ``mode`` argument)."""
 
@@ -61,12 +60,11 @@ class PAT:
             ``mode='points'``.
         area: ``(nTrans, nSensors)`` array with the surface area associated
             with each discretization point. Required for ``mode='points'``.
-        infos_transducers: ``(nTrans, 12)`` array describing the cylindrical
-            elements (center, axis ``e1``, radial vector ``e2``, radius,
-            half-aperture, half-height). Required for all ``cylinder_*``
-            modes. See :func:`patminton.transducers.translation_rotation_system`.
-        n_arcs_per_cylinder: Number of arcs for ``mode='cylinder_arcs'``.
-        n_planes_per_cylinder: Number of planes for ``mode='cylinder_planes'``.
+        infos_transducers: ``(nTrans, 12)`` array describing the elements,
+            flat rectangles for ``mode='plane'`` and cylindrically focused
+            elements for the ``cylinder_*`` modes (see
+            :mod:`patminton.transducers` for the two row formats). See
+            :func:`patminton.transducers.translation_rotation_system`.
         upsample: Time-axis oversampling factor used for the convolution with
             the system kernel of the radial basis function. Larger is more
             accurate but uses more GPU memory. Typical values: 11-51.
@@ -120,8 +118,6 @@ class PAT:
         locPoints=None,
         area=None,
         infos_transducers=None,
-        n_arcs_per_cylinder=25,
-        n_planes_per_cylinder=25,
         upsample=11,
         steps=None,
         steps_border=None,
@@ -194,17 +190,16 @@ class PAT:
         elif (
             mode
             in [
+                "plane",
                 "cylinder_exact",
                 "cylinder_lut",
                 "cylinder_trapezoidal",
-                "cylinder_arcs",
-                "cylinder_planes",
             ]
             and infos_transducers is not None
         ):
             if infos_transducers.shape[1] != 12:
                 raise ValueError(
-                    "Cylinder definition must have 12 columns per transducer"
+                    "Element definition must have 12 columns per transducer"
                 )
 
             nTrans = infos_transducers.shape[0]
@@ -307,8 +302,8 @@ class PAT:
                     ptr_eir,
                     c_bool(use_sparse_optimization),
                 )
-            elif mode == "cylinder_arcs":
-                self.instance = self._lib.createPAT_cylinder_as_arcs(
+            elif mode == "plane":
+                self.instance = self._lib.createPAT_plane(
                     c_int(Nx),
                     c_int(Ny),
                     c_int(Nz),
@@ -321,30 +316,6 @@ class PAT:
                     c_double(c),
                     c_int(nTrans),
                     infos_transducers.ctypes.data_as(POINTER(c_double)),
-                    c_int(n_arcs_per_cylinder),
-                    c_int(upsample),
-                    c_int(steps_border),
-                    c_int(steps),
-                    c_int(blockSize),
-                    c_double(laser_pulse_variance),
-                    ptr_eir,
-                    c_bool(use_sparse_optimization),
-                )
-            elif mode == "cylinder_planes":
-                self.instance = self._lib.createPAT_cylinder_as_planes(
-                    c_int(Nx),
-                    c_int(Ny),
-                    c_int(Nz),
-                    c_double(Lx),
-                    c_double(Ly),
-                    c_double(Lz),
-                    c_int(nT),
-                    c_double(tStart),
-                    c_double(dt),
-                    c_double(c),
-                    c_int(nTrans),
-                    infos_transducers.ctypes.data_as(POINTER(c_double)),
-                    c_int(n_planes_per_cylinder),
                     c_int(upsample),
                     c_int(steps_border),
                     c_int(steps),
@@ -355,8 +326,8 @@ class PAT:
                 )
         else:
             raise ValueError(
-                "mode should be 'points', 'cylinder_exact', 'cylinder_lut', "
-                "'cylinder_trapezoidal', 'cylinder_arcs', 'cylinder_planes'"
+                "mode should be 'points', 'plane', 'cylinder_exact', "
+                "'cylinder_lut', 'cylinder_trapezoidal'"
             )
 
     def __del__(self):

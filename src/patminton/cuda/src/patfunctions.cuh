@@ -123,36 +123,6 @@ __device__ double compute_I_exact(double alpha, double beta, double a, double b)
 __device__ inline int computeStep(int itime, int it_min, int it_max, int it_alpha, int it_beta, int steps_border, int steps, int upsample) ;
 
 
-// =====================================================
-// === Arc decomposition for Cylindrical transducers ===
-// =====================================================
-__device__ void integration_along_arc(int it_min, int it_max,
-				      double cmin, double cmax, double tStart, double dt, double c,
-				      double D_2D, double R_arc, double z_arc,
-				      double Rvp, double s[]) ;
-
-__device__ double integration_along_arcT(int it_min, int it_max,
-				      double cmin, double cmax, double tStart, double dt, double c,
-				      double D_2D, double R_arc, double z_arc,
-				      double s[]) ;
-
-__global__ void linkingArcsToGrid(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-					int nTrans,
-					double tStart, int nT, double dt, double c,
-					double infos_transducers[],
-					int n_arcs_per_cylinder,
-					int upsample, int steps_border, int steps,
-					bool use_sparse_optimization,
-					double d_p[], double d_s[]) ;
-
-__global__ void linkingArcsToGridT(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-					int nTrans,
-					double tStart, int nT, double dt, double c,
-					double infos_transducers[],
-					int n_arcs_per_cylinder,
-					int upsample, int steps_border, int steps,
-					double d_p[], double d_s[]) ;
-
 // ======================================
 // === Planar transducers ===
 // ======================================
@@ -161,7 +131,6 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					double infos_transducers[],
-					int n_planes_per_cylinder,
 					int upsample, int steps_border, int steps,
 					bool use_sparse_optimization,
 					double d_p[], double d_s[]) ;
@@ -170,7 +139,6 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					double infos_transducers[],
-					int n_planes_per_cylinder,
 					int upsample, int steps_border, int steps,
 					double d_p[], double d_s[]) ;
 

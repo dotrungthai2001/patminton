@@ -1669,415 +1669,6 @@ __device__ void bilinear_interp_EF_lut(double sinphi, double k,
 
 }
 
-// =====================================================
-// === Arc decomposition for Cylindrical transducers ===
-// =====================================================
-
-__device__ void integration_along_arc(int it_min, int it_max,
-				      double cmin, double cmax, double tStart, double dt, double c,
-				      double D_2D, double R_arc, double z_arc,
-				      double Rvp, double s[]) {
-	int itime ;
-	double angle, angle_next ;
-	double cosine ;
-	double time ;
-
-	if (it_max <= it_min) return;
-
-	double constant_cosine = (D_2D * D_2D + R_arc * R_arc + z_arc * z_arc) / (2.0 * D_2D * R_arc) ;
-	double coeff_cosine = (c * c) / (2.0 * D_2D * R_arc) ;
-
-	cosine = cmax ;
-	angle = acosf(cosine) ;
-
-	for (itime = it_min; itime < (it_max -1); itime++) {
-		time = tStart + itime * dt ;
-
-		cosine = constant_cosine - coeff_cosine * (time+dt)*(time+dt) ;
-		cosine = max(min(cosine, 1.), -1.) ;
-		angle_next = acosf(cosine) ;
-
-		atomicAdd(&s[itime], (angle_next - angle) * Rvp / time) ;
-		angle = angle_next ;
-	}
-	// handle the last time step
-	itime = it_max - 1 ;
-	time = tStart + itime * dt ;
-	angle_next = acosf(cmin) ;
-	atomicAdd(&s[itime], (angle_next - angle) * Rvp / time) ;
-
-}
-
-__global__ void linkingArcsToGrid(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-					int nTrans,
-					double tStart, int nT, double dt, double c,
-					double infos_transducers[],
-					int n_arcs_per_cylinder,
-					int upsample, int steps_border, int steps,
-					bool use_sparse_optimization,
-					double p[], double s[]
-) {
-	int i, j, k ;
-
-	i = blockIdx.x * blockDim.x + threadIdx.x ; // row of grid pt
-	j = blockIdx.y * blockDim.y + threadIdx.y ; // col of gird pt
-	k = blockIdx.z * blockDim.z + threadIdx.z ;
-
-	if ( (i < Nx) && (j < Ny) && (k < Nz) ) {
-
-		//getting info of grid point
-		double dx, dy, dz ; // grid size
-		double x, y, z ; // coordinates
-		double xs, ys, zs ; // coordinates centered in transducer system
-		double xl, yl, zl ; // coordinales of grid point in the transducer system
-
-		dx = (2*Lx) / (Nx) ;
-		dy = (2*Ly) / (Ny) ;
-		dz = (2*Lz) / (Nz) ;
-        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + (i+0.5)*dx ;
-		y = -Ly + (j+0.5)*dy ;
-		z = -Lz + (k+0.5)*dz ;
-
-		double vp = p[i*Ny*Nz + j*Nz + k] ;
-
-		if (use_sparse_optimization ? (vp > 1e-16) : true) {
-
-		double *s_transducer ;
-		double Rvp ;
-		double D, Dsq ;
-		double a ;
-
-
-		double xc, yc, zc ; // coordinates of transducer center
-		double e1x, e1y, e1z ; // coordinates of the e1 vector
-		double e2x, e2y, e2z ; // coordinates of the e2 vector
-		double R, Rsq ; //radius
-		double theta_max_trans; // half angle of aperture of the transducer
-		double h ; // length of the transducer in its z-axis
-
-		// For geometry
-        double angle_min_mod, angle_max_mod;
-        double cmin, cmax, rmin, rmax;
-
-        // For time integration
-        int it_min, it_max ;
-
-		for (int id_trans = 0 ; id_trans < nTrans ; id_trans++) {
-			// gathering infos of the transducer
-			double xc_cyl = infos_transducers[12*id_trans] ;
-			double yc_cyl = infos_transducers[12*id_trans+1] ;
-			double zc_cyl = infos_transducers[12*id_trans+2] ;
-
-			e1x = infos_transducers[12*id_trans+3] ;
-			e1y = infos_transducers[12*id_trans+4] ;
-			e1z = infos_transducers[12*id_trans+5] ;
-
-			e2x = infos_transducers[12*id_trans+6] ;
-			e2y = infos_transducers[12*id_trans+7] ;
-			e2z = infos_transducers[12*id_trans+8] ;
-
-			R = infos_transducers[12*id_trans+9] ;
-			Rsq = R*R ;
-
-			theta_max_trans = infos_transducers[12*id_trans+10] ;
-			h = infos_transducers[12*id_trans+11] ;
-			double dz_arc_spacing = 2 * h / n_arcs_per_cylinder ;
-			Rvp = R * vp * dz_arc_spacing / c ;
-			s_transducer = &s[id_trans*nT] ;
-
-			//
-			for (int id_arc = 0 ; id_arc < n_arcs_per_cylinder ; id_arc++) {
-				double z_local = -h + (id_arc + 0.5) * dz_arc_spacing ;
-				xc = xc_cyl + z_local * e1x ;
-				yc = yc_cyl + z_local * e1y ;
-				zc = zc_cyl + z_local * e1z ;
-
-				xs = x - xc ;
-				ys = y - yc ;
-				zs = z - zc ;
-				gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, xl, yl, zl) ;
-
-				a = atan2(yl,xl) ;
-				Dsq = xl*xl + yl*yl ;
-				D = sqrt(Dsq) ;
-
-				angle_min_mod = wrap_angle(-a - theta_max_trans) ;
-				angle_max_mod = wrap_angle(-a + theta_max_trans) ;
-
-				if ((angle_min_mod < 0) && (angle_max_mod > 0)) {
-					// Case 1: Voxel projection is inside the arc's angular span (split into 2 segments)
-					cmin = cos(angle_max_mod) ;
-					cmax = 1.0 ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					integration_along_arc(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, Rvp, s_transducer) ;
-
-					cmin = cos(angle_min_mod) ;
-					cmax = 1.0 ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					integration_along_arc(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, Rvp, s_transducer) ;
-
-				} else if ((angle_min_mod > 0) && (angle_max_mod < 0)) {
-					// Case 2
-					cmin = -1.0 ;
-					cmax = cos(angle_min_mod) ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					integration_along_arc(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, Rvp, s_transducer) ;
-
-					cmin = -1.0 ;
-					cmax = cos(angle_max_mod) ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					integration_along_arc(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, Rvp, s_transducer) ;
-
-				} else {
-					if ((angle_min_mod < 0) & (angle_max_mod < 0)) {
-					// Case 3
-					cmin = cos(angle_min_mod) ;
-					cmax = cos(angle_max_mod) ;
-					} else {
-					// Case 4
-					cmin = cos(angle_max_mod) ;
-					cmax = cos(angle_min_mod) ;
-					}
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					integration_along_arc(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, Rvp, s_transducer) ;
-				}
-			}
-		}
-		}
-	}
-}
-
-__device__ double integration_along_arcT(int it_min, int it_max,
-				      double cmin, double cmax, double tStart, double dt, double c,
-				      double D_2D, double R_arc, double z_arc,
-				      double s[]) {
-	int itime ;
-	double angle, angle_next ;
-	double cosine ;
-	double time ;
-	double value = 0.0;
-
-
-	double constant_cosine = (D_2D * D_2D + R_arc * R_arc + z_arc * z_arc) / (2.0 * D_2D * R_arc) ;
-	double coeff_cosine = (c * c) / (2.0 * D_2D * R_arc) ;
-
-	cosine = cmax ;
-	angle = acosf(cosine) ;
-
-	for (itime = it_min; itime < (it_max -1); itime++) {
-		time = tStart + itime * dt ;
-
-		cosine = constant_cosine - coeff_cosine * (time+dt)*(time+dt) ;
-		cosine = max(min(cosine, 1.), -1.) ;
-		angle_next = acosf(cosine) ;
-
-		value += s[itime] * (angle_next - angle) / time ;
-		angle = angle_next ;
-	}
-	// handle the last time step
-	itime = it_max - 1 ;
-	time = tStart + itime * dt ;
-	angle_next = acosf(cmin) ;
-	value += s[itime] * (angle_next - angle) / time ;
-
-	return value ;
-}
-
-__global__ void linkingArcsToGridT(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-					int nTrans,
-					double tStart, int nT, double dt, double c,
-					double infos_transducers[],
-					int n_arcs_per_cylinder,
-					int upsample, int steps_border, int steps,
-					double p[], double s[]
-) {
-	int i, j, k ;
-
-	i = blockIdx.x * blockDim.x + threadIdx.x ; // row of grid pt
-	j = blockIdx.y * blockDim.y + threadIdx.y ; // col of gird pt
-	k = blockIdx.z * blockDim.z + threadIdx.z ;
-
-	if ( (i < Nx) && (j < Ny) && (k < Nz) ) {
-
-		//getting info of grid point
-		double dx, dy, dz ; // grid size
-		double x, y, z ; // coordinates
-		double xs, ys, zs ; // coordinates centered in transducer system
-		double xl, yl, zl ; // coordinales of grid point in the transducer system
-
-		dx = (2*Lx) / (Nx) ;
-		dy = (2*Ly) / (Ny) ;
-		dz = (2*Lz) / (Nz) ;
-        // the physical coordinates x and y of the grid point using the grid dimensions and physical dimensions.
-		x = -Lx + (i+0.5)*dx ;
-		y = -Ly + (j+0.5)*dy ;
-		z = -Lz + (k+0.5)*dz ;
-
-		double value = 0.0 ;
-		double value_transducer = 0.0 ;
-		double *s_transducer ;
-		double D, Dsq ;
-		double a ;
-
-		double xc, yc, zc ; // coordinates of transducer center
-		double e1x, e1y, e1z ; // coordinates of the e1 vector
-		double e2x, e2y, e2z ; // coordinates of the e2 vector
-		double R, Rsq ; //radius
-		double theta_max_trans; // half angle of aperture of the transducer
-		double h ; // length of the transducer in its z-axis
-
-		// For geometry
-        double angle_min_mod, angle_max_mod;
-        double cmin, cmax, rmin, rmax;
-
-        // For time integration
-        int it_min, it_max ;
-
-		for (int id_trans = 0 ; id_trans < nTrans ; id_trans++) {
-			value_transducer = 0.0 ;
-			// gathering infos of the transducer
-			double xc_cyl = infos_transducers[12*id_trans] ;
-			double yc_cyl = infos_transducers[12*id_trans+1] ;
-			double zc_cyl = infos_transducers[12*id_trans+2] ;
-
-			e1x = infos_transducers[12*id_trans+3] ;
-			e1y = infos_transducers[12*id_trans+4] ;
-			e1z = infos_transducers[12*id_trans+5] ;
-
-			e2x = infos_transducers[12*id_trans+6] ;
-			e2y = infos_transducers[12*id_trans+7] ;
-			e2z = infos_transducers[12*id_trans+8] ;
-
-			R = infos_transducers[12*id_trans+9] ;
-			Rsq = R*R ;
-
-			theta_max_trans = infos_transducers[12*id_trans+10] ;
-			h = infos_transducers[12*id_trans+11] ;
-			double dz_arc_spacing = 2 * h / n_arcs_per_cylinder ;
-			s_transducer = &s[id_trans*nT] ;
-
-			//
-			for (int id_arc = 0 ; id_arc < n_arcs_per_cylinder ; id_arc++) {
-				double z_local = -h + (id_arc + 0.5) * dz_arc_spacing ;
-				xc = xc_cyl + z_local * e1x ;
-				yc = yc_cyl + z_local * e1y ;
-				zc = zc_cyl + z_local * e1z ;
-
-				xs = x - xc ;
-				ys = y - yc ;
-				zs = z - zc ;
-				gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, xl, yl, zl) ;
-
-				a = atan2(yl,xl) ;
-				Dsq = xl*xl + yl*yl ;
-				D = sqrt(Dsq) ;
-
-				angle_min_mod = wrap_angle(-a - theta_max_trans) ;
-				angle_max_mod = wrap_angle(-a + theta_max_trans) ;
-
-				if ((angle_min_mod < 0) && (angle_max_mod > 0)) {
-					// Case 1: Voxel projection is inside the arc's angular span (split into 2 segments)
-					cmin = cos(angle_max_mod) ;
-					cmax = 1.0 ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					value_transducer += integration_along_arcT(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, &s[id_trans * nT]) ;
-
-					cmin = cos(angle_min_mod) ;
-					cmax = 1.0 ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					value_transducer += integration_along_arcT(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, &s[id_trans * nT]) ;
-
-				} else if ((angle_min_mod > 0) && (angle_max_mod < 0)) {
-					// Case 2
-					cmin = -1.0 ;
-					cmax = cos(angle_min_mod) ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					value_transducer += integration_along_arcT(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, &s[id_trans * nT]) ;
-
-					cmin = -1.0 ;
-					cmax = cos(angle_max_mod) ;
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					value_transducer += integration_along_arcT(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, &s[id_trans * nT]) ;
-
-				} else {
-					if ((angle_min_mod < 0) & (angle_max_mod < 0)) {
-					// Case 3
-					cmin = cos(angle_min_mod) ;
-					cmax = cos(angle_max_mod) ;
-					} else {
-					// Case 4
-					cmin = cos(angle_max_mod) ;
-					cmax = cos(angle_min_mod) ;
-					}
-					rmin = sqrt((Dsq + Rsq - 2 * D * R * cmax) + zl * zl) ;
-					rmax = sqrt((Dsq + Rsq - 2 * D * R * cmin) + zl * zl) ;
-					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT), 0);
-					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT), 0);
-
-					value_transducer += integration_along_arcT(it_min, it_max, cmin, cmax, tStart, dt, c,
-							D, R, zl, &s[id_trans * nT]) ;
-				}
-			}
-			value += (R * dz_arc_spacing / c) * value_transducer ;
-		}
-		p[Ny * Nz * i + Nz * j + k] = value ;
-	}
-}
-
 // ======================================
 // === Planar transducers ===
 // ======================================
@@ -2095,12 +1686,14 @@ __device__ double compute_I_plane(double a, double x) {
     // return 1.0 ;
     return 0.5 * (x * s + asq * as);
 }
-// Planar rectangular transducer kernel (forward)
+// Planar rectangular transducer kernel (forward). The wavefront of radius
+// r = c t cuts the element plane, at distance z_pl, in a circle of radius
+// rho = sqrt(r^2 - z_pl^2); each time step accumulates the area of that disk
+// inside the rectangle gained since the previous step.
 __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					double infos_transducers[],
-					int n_planes_per_cylinder,
 					int upsample, int steps_border, int steps,
 					bool use_sparse_optimization,
 					double p[], double s[]
@@ -2135,14 +1728,11 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 		double *s_transducer ;
 		double Rvp ;
 
-		double xc, yc, zc ; // coordinates of transducer center
-		double e1x, e1y, e1z ; // coordinates of the e1 vector
-		double e2x, e2y, e2z ; // coordinates of the e2 vector
-		double a, b ;
-
-		double R ; //radius
-		double theta_max_trans; // half angle of aperture of the transducer
-		double h ; // length of the transducer in its z-axis
+		double xc, yc, zc ; // coordinates of the center of the element face
+		double e1x, e1y, e1z ; // coordinates of the e1 vector (in the face)
+		double e2x, e2y, e2z ; // coordinates of the e2 vector (normal to the face)
+		double w, h ; // half-extents of the face across and along e1
+		double z_pl ; // distance from the grid point to the element plane
 
 		int n_xi, n_upsilon ;
 		int xi, upsilon ;
@@ -2178,121 +1768,96 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 			e2y = infos_transducers[12*id_trans+7] ;
 			e2z = infos_transducers[12*id_trans+8] ;
 
-			R = infos_transducers[12*id_trans+9] ;
-			theta_max_trans = infos_transducers[12*id_trans+10] ;
+			w = infos_transducers[12*id_trans+10] ;
 			h = infos_transducers[12*id_trans+11] ;
-
-			double dtheta = 2.0 * theta_max_trans / n_planes_per_cylinder;
 
 			Rvp = vp / c ;
 			s_transducer = &s[id_trans*nT] ;
 
-			// converting grid coordinates to transducers system of coords
+			// converting grid coordinates to transducers system of coords:
+			// x_cl along the normal e2, y_cl along e3 = e1 x e2, z_cl along e1
 			xs = x - xc ;
 			ys = y - yc ;
 			zs = z - zc ;
 
 			gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, x_cl, y_cl, z_cl) ;
 
-			a = 0.5 * R * sin(dtheta);
-			b = h;
+			z_pl = x_cl ;
+			splitZDomain(z_cl, h, Xsq, n_xi) ; //writes in Xsq and n_xi
+			splitZDomain(y_cl, w, Ysq, n_upsilon) ; //write in Ysq and in n_upsilon
 
-			for (int ip = 0 ; ip < n_planes_per_cylinder ; ip++) {
-				double theta = -theta_max_trans + (ip + 0.5) * dtheta ;
+			for (xi = 0 ; xi < n_xi ; xi++) {
+				Xsq_min = Xsq[xi][0] ;
+				Xsq_max = Xsq[xi][1] ;
+				Xmin = sqrt(Xsq_min) ;
+				Xmax = sqrt(Xsq_max) ;
 
-				// plane center (tangent point)
-				double xc_p = R * cos(theta);
-				double yc_p = R * sin(theta);
-				double zc_p = 0.0;
+				for (upsilon = 0 ; upsilon < n_upsilon ; upsilon++) {
+					Ysq_min = Ysq[upsilon][0] ;
+					Ysq_max = Ysq[upsilon][1] ;
+					Ymin = sqrt(Ysq_min) ;
+					Ymax = sqrt(Ysq_max) ;
 
-				// plane local frame
-				double npx = cos(theta);
-				double npy = sin(theta);
+					// compute limits for integration
+					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
+					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
-				double tpx = -npy;
-				double tpy =  npx;
+					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
+					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
+					it_min_upsample = upsample * (it_min / upsample + 1);
+					it_max_upsample = upsample * (it_max / upsample);
 
-				// coordinates in plane frame
-				double z_pl = (x_cl - xc_p) * npx + (y_cl - yc_p) * npy;
-				double y_pl = (x_cl - xc_p) * tpx + (y_cl - yc_p) * tpy;
-				double x_pl = z_cl;
+					I = 0.0;
+					xalpha = Xmin;
+					xbeta = Xmin;
 
-				splitZDomain(x_pl, a, Xsq, n_xi) ; //writes in Xsq and n_xi
-				splitZDomain(y_pl, b, Ysq, n_upsilon) ; //write in Ysq and in n_upsilon
+					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+						// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
+						// then every upsample iteration compute area
+						// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
+						step = (itime < it_min_upsample)
+							? min(steps_border, it_min_upsample - itime + 1)
+							: (itime >= it_max_upsample)
+								? min(steps_border, it_max - 1 - itime + 1)
+								: steps;
 
-				for (xi = 0 ; xi < n_xi ; xi++) {
-					Xsq_min = Xsq[xi][0] ;
-					Xsq_max = Xsq[xi][1] ;
-					Xmin = sqrt(Xsq_min) ;
-					Xmax = sqrt(Xsq_max) ;
+						time = tStart + itime * dt;
+						time_next = time + step*dt;
+						r_next = c * time_next;
+						r_next_sq = r_next * r_next;
 
-					for (upsilon = 0 ; upsilon < n_upsilon ; upsilon++) {
-						Ysq_min = Ysq[upsilon][0] ;
-						Ysq_max = Ysq[upsilon][1] ;
-						Ymin = sqrt(Ysq_min) ;
-						Ymax = sqrt(Ysq_max) ;
+						// compute the next squared radius
+						rho_next_sq = r_next_sq - z_pl * z_pl;
+						rho_next = (rho_next_sq > 0.0) ? sqrt(rho_next_sq) : 0.0;
 
-						// compute limits for integration
-						rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
-						rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
+						// X bounds: intersection between circle and vertical sides of detection window
+						xalpha_next = fmax(Xmin, sqrt(fmax(0.0, rho_next_sq - Ysq_max)));
+						xbeta_next  = fmin(Xmax,  sqrt(fmax(0.0, rho_next_sq - Ysq_min)));
 
-						it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
-						it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
-						it_min_upsample = upsample * (it_min / upsample + 1);
-						it_max_upsample = upsample * (it_max / upsample);
+						I_next =  compute_I_plane(rho_next, xbeta_next) - compute_I_plane(rho_next, xalpha_next) ;
 
-						I = 0.0;
-						xalpha = Xmin;
-						xbeta = Xmin;
+						area = (xalpha_next - xalpha) * Ymax + I_next - I - (xbeta_next - xbeta) * Ymin;
 
-						for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
-							// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
-							// then every upsample iteration compute area
-							// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
-							step = (itime < it_min_upsample)
-								? min(steps_border, it_min_upsample - itime + 1)
-								: (itime >= it_max_upsample)
-									? min(steps_border, it_max - 1 - itime + 1)
-									: steps;
+						value = area * Rvp / time / step;
 
-							time = tStart + itime * dt;
-							time_next = time + step*dt;
-							r_next = c * time_next;
-							r_next_sq = r_next * r_next;
-
-							// compute the next squared radius
-							rho_next_sq = r_next_sq - z_pl * z_pl;
-							rho_next = (rho_next_sq > 0.0) ? sqrt(rho_next_sq) : 0.0;
-
-							// X bounds: intersection between circle and vertical sides of detection window
-							xalpha_next = fmax(Xmin, sqrt(fmax(0.0, rho_next_sq - Ysq_max)));
-							xbeta_next  = fmin(Xmax,  sqrt(fmax(0.0, rho_next_sq - Ysq_min)));
-
-							I_next =  compute_I_plane(rho_next, xbeta_next) - compute_I_plane(rho_next, xalpha_next) ;
-
-							area = (xalpha_next - xalpha) * Ymax + I_next - I - (xbeta_next - xbeta) * Ymin;
-
-							value = area * Rvp / time / step;
-
-							for (istep = 0 ; istep < step ; istep++) {
-								atomicAdd(&s_transducer[itime+istep], value) ;
-							}
-
-							I = I_next ;
-							xalpha = xalpha_next ;
-							xbeta = xbeta_next ;
-							itime += step ;
+						for (istep = 0 ; istep < step ; istep++) {
+							atomicAdd(&s_transducer[itime+istep], value) ;
 						}
 
-						itime = it_max - 1 ;
-						time = tStart + itime*dt ;
-						xalpha_next = Xmax ;
-						xbeta_next = Xmax ;
-						I_next = 0. ;
-						area = (xalpha_next - xalpha)*Ymax - I - (xbeta_next - xbeta) * Ymin ;
-
-						atomicAdd(&s_transducer[itime], area*Rvp / time) ;
+						I = I_next ;
+						xalpha = xalpha_next ;
+						xbeta = xbeta_next ;
+						itime += step ;
 					}
+
+					itime = it_max - 1 ;
+					time = tStart + itime*dt ;
+					xalpha_next = Xmax ;
+					xbeta_next = Xmax ;
+					I_next = 0. ;
+					area = (xalpha_next - xalpha)*Ymax - I - (xbeta_next - xbeta) * Ymin ;
+
+					atomicAdd(&s_transducer[itime], area*Rvp / time) ;
 				}
 			}
 		}
@@ -2300,11 +1865,11 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 	}
 }
 
+// Planar rectangular transducer kernel (adjoint of linkingPlanesToGrid)
 __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					double infos_transducers[],
-					int n_planes_per_cylinder,
 					int upsample, int steps_border, int steps,
 					double p[], double s[])
 {
@@ -2333,14 +1898,11 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 		double *s_transducer ;
 		double Rvp ;
 
-		double xc, yc, zc ; // coordinates of transducer center
-		double e1x, e1y, e1z ; // coordinates of the e1 vector
-		double e2x, e2y, e2z ; // coordinates of the e2 vector
-		double a, b ; // half lengths of the rectangle
-
-		double R ; //radius
-		double theta_max_trans; // half angle of aperture of the transducer
-		double h ; // length of the transducer in its z-axis
+		double xc, yc, zc ; // coordinates of the center of the element face
+		double e1x, e1y, e1z ; // coordinates of the e1 vector (in the face)
+		double e2x, e2y, e2z ; // coordinates of the e2 vector (normal to the face)
+		double w, h ; // half-extents of the face across and along e1
+		double z_pl ; // distance from the grid point to the element plane
 
 		int n_xi, n_upsilon ;
 		int xi, upsilon ;
@@ -2379,120 +1941,94 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 			e2y = infos_transducers[12*id_trans+7] ;
 			e2z = infos_transducers[12*id_trans+8] ;
 
-			R   = infos_transducers[12 * id_trans + 9];
-			theta_max_trans = infos_transducers[12 * id_trans + 10];
-			h   = infos_transducers[12 * id_trans + 11];
-
-			double dtheta = 2.0 * theta_max_trans / n_planes_per_cylinder;
+			w = infos_transducers[12*id_trans+10] ;
+			h = infos_transducers[12*id_trans+11] ;
 
 			Rvp = 1. / c ;
 			s_transducer = &s[id_trans*nT] ;
 
-			// converting grid coordinates to transducers system of coords
+			// converting grid coordinates to transducers system of coords:
+			// x_cl along the normal e2, y_cl along e3 = e1 x e2, z_cl along e1
 			xs = x - xc ;
 			ys = y - yc ;
 			zs = z - zc ;
 
 			gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, x_cl, y_cl, z_cl) ;
 
-			a = 0.5 * R * sin(dtheta);
-			b = h;
+			z_pl = x_cl ;
+			splitZDomain(z_cl, h, Xsq, n_xi) ; //writes in Xsq and n_xi
+			splitZDomain(y_cl, w, Ysq, n_upsilon) ; //write in Ysq and in n_upsilon
 
-			for (int ip = 0 ; ip < n_planes_per_cylinder ; ip++) {
-				double theta = -theta_max_trans + (ip + 0.5) * dtheta ;
+			for (xi = 0 ; xi < n_xi ; xi++) {
+				Xsq_min = Xsq[xi][0] ;
+				Xsq_max = Xsq[xi][1] ;
+				Xmin = sqrt(Xsq_min) ;
+				Xmax = sqrt(Xsq_max) ;
 
-				// plane center (tangent point)
-				double xc_p = R * cos(theta);
-				double yc_p = R * sin(theta);
-				double zc_p = 0.0;
+				for (upsilon = 0 ; upsilon < n_upsilon ; upsilon++) {
+					Ysq_min = Ysq[upsilon][0] ;
+					Ysq_max = Ysq[upsilon][1] ;
+					Ymin = sqrt(Ysq_min) ;
+					Ymax = sqrt(Ysq_max) ;
 
-				// plane local frame
-				double npx = cos(theta);
-				double npy = sin(theta);
+					// compute limits for integration
+					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
+					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
-				double tpx = -npy;
-				double tpy =  npx;
+					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
+					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
+					it_min_upsample = upsample * (it_min / upsample + 1);
+					it_max_upsample = upsample * (it_max / upsample);
 
-				// coordinates in plane frame
-				double z_pl = (x_cl - xc_p) * npx + (y_cl - yc_p) * npy;
-				double y_pl = (x_cl - xc_p) * tpx + (y_cl - yc_p) * tpy;
-				double x_pl = z_cl;
+					I = 0.0;
+					xalpha = Xmin;
+					xbeta = Xmin;
 
-				splitZDomain(x_pl, a, Xsq, n_xi) ; //writes in Xsq and n_xi
-				splitZDomain(y_pl, b, Ysq, n_upsilon) ; //write in Ysq and in n_upsilon
+					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+						// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
+						// then every upsample iteration compute area
+						// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
+						step = (itime < it_min_upsample)
+							? min(steps_border, it_min_upsample - itime + 1)
+							: (itime >= it_max_upsample)
+								? min(steps_border, it_max - 1 - itime + 1)
+								: steps;
 
-				for (xi = 0 ; xi < n_xi ; xi++) {
-					Xsq_min = Xsq[xi][0] ;
-					Xsq_max = Xsq[xi][1] ;
-					Xmin = sqrt(Xsq_min) ;
-					Xmax = sqrt(Xsq_max) ;
+						time = tStart + itime * dt;
+						time_next = time + step*dt;
+						r_next = c * time_next;
+						r_next_sq = r_next * r_next;
 
-					for (upsilon = 0 ; upsilon < n_upsilon ; upsilon++) {
-						Ysq_min = Ysq[upsilon][0] ;
-						Ysq_max = Ysq[upsilon][1] ;
-						Ymin = sqrt(Ysq_min) ;
-						Ymax = sqrt(Ysq_max) ;
+						// compute the next squared radius
+						rho_next_sq = r_next_sq - z_pl * z_pl;
+						rho_next = (rho_next_sq > 0.0) ? sqrt(rho_next_sq) : 0.0;
 
-						// compute limits for integration
-						rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
-						rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
+						// X bounds: intersection between circle and vertical sides of detection window
+						xalpha_next = fmax(Xmin, sqrt(fmax(0.0, rho_next_sq - Ysq_max)));
+						xbeta_next  = fmin(Xmax,  sqrt(fmax(0.0, rho_next_sq - Ysq_min)));
 
-						it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
-						it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
-						it_min_upsample = upsample * (it_min / upsample + 1);
-						it_max_upsample = upsample * (it_max / upsample);
+						I_next =  compute_I_plane(rho_next, xbeta_next) - compute_I_plane(rho_next, xalpha_next) ;
 
-						I = 0.0;
-						xalpha = Xmin;
-						xbeta = Xmin;
+						area = (xalpha_next - xalpha) * Ymax + I_next - I - (xbeta_next - xbeta) * Ymin;
 
-						for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
-							// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
-							// then every upsample iteration compute area
-							// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
-							step = (itime < it_min_upsample)
-								? min(steps_border, it_min_upsample - itime + 1)
-								: (itime >= it_max_upsample)
-									? min(steps_border, it_max - 1 - itime + 1)
-									: steps;
-
-							time = tStart + itime * dt;
-							time_next = time + step*dt;
-							r_next = c * time_next;
-							r_next_sq = r_next * r_next;
-
-							// compute the next squared radius
-							rho_next_sq = r_next_sq - z_pl * z_pl;
-							rho_next = (rho_next_sq > 0.0) ? sqrt(rho_next_sq) : 0.0;
-
-							// X bounds: intersection between circle and vertical sides of detection window
-							xalpha_next = fmax(Xmin, sqrt(fmax(0.0, rho_next_sq - Ysq_max)));
-							xbeta_next  = fmin(Xmax,  sqrt(fmax(0.0, rho_next_sq - Ysq_min)));
-
-							I_next =  compute_I_plane(rho_next, xbeta_next) - compute_I_plane(rho_next, xalpha_next) ;
-
-							area = (xalpha_next - xalpha) * Ymax + I_next - I - (xbeta_next - xbeta) * Ymin;
-
-
-							for (istep = 0 ; istep < step ; istep++) {
-								value_transducer += s_transducer[itime+istep] * area / time / step ;
-							}
-
-							I = I_next ;
-							xalpha = xalpha_next ;
-							xbeta = xbeta_next ;
-							itime += step ;
+						for (istep = 0 ; istep < step ; istep++) {
+							value_transducer += s_transducer[itime+istep] * area / time / step ;
 						}
 
-						itime = it_max - 1 ;
-						time = tStart + itime*dt ;
-						xalpha_next = Xmax ;
-						xbeta_next = Xmax ;
-						I_next = 0. ;
-						area = (xalpha_next - xalpha)*Ymax - I - (xbeta_next - xbeta) * Ymin ;
-
-						value_transducer += s_transducer[itime] * area / time ;
+						I = I_next ;
+						xalpha = xalpha_next ;
+						xbeta = xbeta_next ;
+						itime += step ;
 					}
+
+					itime = it_max - 1 ;
+					time = tStart + itime*dt ;
+					xalpha_next = Xmax ;
+					xbeta_next = Xmax ;
+					I_next = 0. ;
+					area = (xalpha_next - xalpha)*Ymax - I - (xbeta_next - xbeta) * Ymin ;
+
+					value_transducer += s_transducer[itime] * area / time ;
 				}
 			}
 			value += Rvp * value_transducer ;

@@ -12,7 +12,7 @@ a rotating and translating probe that circles the sample. Each element
 integrates the pressure field over its surface, so the received signal
 depends on the element geometry and its position relative to the tissue.
 
-**Goal:** recover the 3D initial pressure distribution $p(x)$ — which
+**Goal:** recover the 3D initial pressure distribution $p_0(x)$ — which
 reflects the optical absorption map — from the time-domain signals $s(t)$
 of all transducers.
 

@@ -131,43 +131,21 @@ class PAT_cylinder : public PAT{
 
 } ;
 
-class PAT_cylinder_planes : public PAT_cylinder {
-    protected:
-        int n_planes_per_cylinder_ ;
+// Flat rectangular elements. PAT_cylinder only stores the 12-column element
+// rows and the integration steps, which the planar model shares.
+class PAT_plane : public PAT_cylinder {
     public:
-       PAT_cylinder_planes( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-                            int nT, double tStart, double dt, double c,
-                            int nTransducers, double *infos_transducers, // Host pointer
-                            int n_planes_per_cylinder,
-                            int upsample, int steps_border, int steps,
-                            int blockSize, double laser_pulse_variance,
-                            double* eir,
-                            bool use_sparse_optimization);
-       ~PAT_cylinder_planes() ;
+       PAT_plane( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+                  int nT, double tStart, double dt, double c,
+                  int nTransducers, double *infos_transducers, // Host pointer
+                  int upsample, int steps_border, int steps,
+                  int blockSize, double laser_pulse_variance,
+                  double* eir,
+                  bool use_sparse_optimization);
+       ~PAT_plane() ;
     protected:
-        // implementation of the cylinder discretized in planes
-   	    virtual void compute_signal_u(double* d_p) override ;
-       	virtual void bp_signal_u(double* d_p) override ;
-
-} ;
-
-class PAT_cylinder_arcs : public PAT_cylinder {
-    protected:
-        int n_arcs_per_cylinder_ ;
-    public:
-       PAT_cylinder_arcs( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
-                            int nT, double tStart, double dt, double c,
-                            int nTransducers, double *infos_transducers, // Host pointer
-                            int n_arcs_per_cylinder,
-                            int upsample, int steps_border, int steps,
-                            int blockSize, double laser_pulse_variance,
-                            double* eir,
-                            bool use_sparse_optimization);
-       ~PAT_cylinder_arcs() ;
-    protected:
-        // implementation of the cylinder discretized in planes
-   	    virtual void compute_signal_u(double* d_p) override ;
-       	virtual void bp_signal_u(double* d_p) override ;
+        virtual void compute_signal_u(double* d_p) override ;
+        virtual void bp_signal_u(double* d_p) override ;
 
 } ;
 

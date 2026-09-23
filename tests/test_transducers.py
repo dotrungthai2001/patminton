@@ -3,7 +3,11 @@
 import numpy as np
 import pytest
 
-from patminton import discretize_cylindrical_transducers, translation_rotation_system
+from patminton import (
+    discretize_cylindrical_transducers,
+    discretize_planar_transducers,
+    translation_rotation_system,
+)
 
 RADIUS = 25e-3
 HEIGHT = 7.5e-3
@@ -91,3 +95,52 @@ def test_discretization_geometry():
 
     # the arc is centered on the e2 direction
     assert np.all(radial @ e2 > 0)
+
+
+def _probe(element):
+    return translation_rotation_system(
+        transducer_radius=RADIUS,
+        transducer_height=HEIGHT,
+        transducer_width=WIDTH,
+        transducer_pitch=0.289e-3,
+        transducer_nbr_elements=64,
+        transducer_wavelength=C / FC,
+        grid_size=2e-3,
+        element=element,
+    )
+
+
+def test_plane_rows_match_cylinder_probe(infos):
+    planes = _probe("plane")
+    assert planes.shape == infos.shape
+    # same axes; the face lies at the middle of the arc, c + R e2
+    assert np.allclose(planes[:, 3:9], infos[:, 3:9])
+    assert np.allclose(planes[:, :3], infos[:, :3] + RADIUS * infos[:, 6:9])
+    assert np.all(planes[:, 9] == 0)
+    assert np.allclose(planes[:, 10], HEIGHT / 2)
+    assert np.allclose(planes[:, 11], WIDTH / 2)
+
+
+def test_unknown_element_raises():
+    with pytest.raises(ValueError):
+        _probe("sphere")
+
+
+def test_planar_discretization_geometry():
+    planes = _probe("plane")[:3]
+    n_h, n_w = 9, 4
+    points, area = discretize_planar_transducers(planes, n_h, n_w)
+
+    assert points.shape == (3, n_h * n_w, 3)
+    assert area.shape == (3, n_h * n_w)
+
+    for row, pts, a in zip(planes, points, area):
+        c, e1, e2 = row[0:3], row[3:6], row[6:9]
+        e3 = np.cross(e1, e2)
+        w, h = row[10], row[11]
+        d = pts - c
+        # total area of the face, points in its plane, centered, within bounds
+        assert np.isclose(a.sum(), 4 * w * h, rtol=1e-12)
+        assert np.allclose(d @ e2, 0.0, atol=1e-15)
+        assert np.allclose(d.mean(axis=0), 0.0, atol=1e-15)
+        assert np.all(np.abs(d @ e3) <= w) and np.all(np.abs(d @ e1) <= h)

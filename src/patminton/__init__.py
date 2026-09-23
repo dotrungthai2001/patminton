@@ -8,9 +8,11 @@ iterative reconstruction algorithms built on top of them.
 from .operator import MODES, PAT
 from .transducers import (
     discretize_cylindrical_transducers,
+    discretize_planar_transducers,
     translation_rotation_system,
 )
 from .algorithms import (
+    PSNR,
     SNR,
     compute_ssim_3d,
     estimate_lipschitz,
@@ -21,13 +23,14 @@ from .algorithms import (
     normalize_operator,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "PAT",
     "MODES",
     "translation_rotation_system",
     "discretize_cylindrical_transducers",
+    "discretize_planar_transducers",
     "least_squares_CG",
     "least_squares_LBFGSB",
     "least_squares_PGD",
@@ -35,6 +38,7 @@ __all__ = [
     "estimate_lipschitz",
     "normalize_operator",
     "SNR",
+    "PSNR",
     "compute_ssim_3d",
     "__version__",
 ]

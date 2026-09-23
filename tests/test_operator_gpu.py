@@ -45,8 +45,7 @@ WIDTH = 0.250e-3
 DEVICE = "cuda:0"
 
 
-@pytest.fixture(scope="module")
-def infos():
+def _probe(element):
     infos = patminton.translation_rotation_system(
         transducer_radius=RADIUS,
         transducer_height=HEIGHT,
@@ -55,30 +54,44 @@ def infos():
         transducer_nbr_elements=64,
         transducer_wavelength=C / 5e6,
         grid_size=2 * L,
+        element=element,
     )
     return np.ascontiguousarray(infos[:8])
 
 
-def make_pat(mode, infos, **kwargs):
+@pytest.fixture(scope="module")
+def infos():
+    return _probe("cylinder")
+
+
+@pytest.fixture(scope="module")
+def plane_infos():
+    return _probe("plane")
+
+
+def make_pat(mode, infos, points=None, **kwargs):
+    """`points`: (locPoints, area) for mode='points'; default: the
+    cylindrical elements of `infos` sampled on 15 x 3 points."""
     common = dict(nT=NT, tStart=TSTART, dt=DT, c=C, upsample=5,
                   laser_pulse_variance=5e-9)
     common.update(kwargs)
     if mode == "points":
-        points, area = patminton.discretize_cylindrical_transducers(infos, 15, 3)
+        if points is None:
+            points = patminton.discretize_cylindrical_transducers(infos, 15, 3)
         return patminton.PAT(N, N, N, L, L, L, mode="points",
-                         locPoints=points, area=area, **common)
+                         locPoints=points[0], area=points[1], **common)
     return patminton.PAT(N, N, N, L, L, L, mode=mode,
                      infos_transducers=infos, **common)
 
 
 ALL_MODES = ["cylinder_lut", "cylinder_exact", "cylinder_trapezoidal",
-             "cylinder_arcs", "cylinder_planes", "points"]
+             "plane", "points"]
 
 
 @pytest.mark.parametrize("mode", ALL_MODES)
-def test_adjoint_dot_product(mode, infos):
+def test_adjoint_dot_product(mode, infos, plane_infos):
     """<A x, y> == <x, A^T y> to double precision, for every transducer model."""
-    pat = make_pat(mode, infos)
+    pat = make_pat(mode, plane_infos if mode == "plane" else infos)
     torch.manual_seed(0)
     x = torch.rand((N, N, N), dtype=torch.float64, device=DEVICE)
     y = torch.rand((pat.nTrans, NT), dtype=torch.float64, device=DEVICE)
@@ -135,3 +148,23 @@ def test_cylinder_modes_agree(infos):
     s_exact = make_pat("cylinder_exact", infos) @ p
     rel = (s_lut - s_exact).norm() / s_exact.norm()
     assert rel.item() < 1e-2
+
+
+def test_plane_matches_points(plane_infos):
+    """Point quadrature of the same flat faces converges to the plane model.
+
+    The faces are 7.5 mm x 0.25 mm, so swapping their two extents, or a
+    wrong scale, gives an O(1) error rather than a quadrature error.
+    """
+    p = torch.zeros((N, N, N), dtype=torch.float64, device=DEVICE)
+    p[N // 2, N // 2, N // 2] = 1.0
+    s_plane = make_pat("plane", plane_infos) @ p
+
+    def rel_err(n_h, n_w):
+        points = patminton.discretize_planar_transducers(plane_infos, n_h, n_w)
+        s_points = make_pat("points", None, points=points) @ p
+        return ((s_points - s_plane).norm() / s_plane.norm()).item()
+
+    coarse, fine = rel_err(15, 3), rel_err(151, 7)
+    assert fine < coarse
+    assert fine < 0.2

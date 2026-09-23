@@ -1,40 +1,54 @@
 # Transducer models
 
+Every mode computes the same quantity: the pressure integrated over the
+element surface. The modes differ in the element geometry they describe and
+in how they evaluate the surface integral.
+
+| Geometry | Mode | Surface integral |
+| -------- | ---- | ---------------- |
+| Flat rectangle | `plane` | closed form |
+| Cylindrically focused | `cylinder_exact` | closed form, Carlson elliptic integrals |
+| | `cylinder_lut` | closed form, tabulated elliptic integrals |
+| | `cylinder_trapezoidal` | trapezoidal rule on the arc integral |
+| Any surface | `points` | quadrature over points |
+
+`plane` and the `cylinder_*` modes each exploit one geometry. `points` is a
+numerical method rather than a geometry: it replaces the surface by points
+with areas, so it applies to any element shape, including the two above.
+
 ## Element parametrization
 
-Each cylindrical element is described by 12 parameters, one row of the
-`infos_transducers` array (used by all `cylinder_*` modes):
+The closed-form modes take one row of 12 parameters per element, the
+`infos_transducers` array:
 
-| Index | Parameter | Description |
-| ----- | --------- | ----------- |
-| 0–2 | $(x_c, y_c, z_c)$ | Center position (m) |
-| 3–5 | $e_1$ | Axis unit vector (cylinder axis) |
-| 6–8 | $e_2$ | Radial unit vector (normal to axis, toward imaging center) |
-| 9 | $R$ | Cylinder radius (m) |
-| 10 | $\theta_{\max}$ | Half-aperture angle (rad) |
-| 11 | $h$ | Half-height of the element (m) |
+| Index | Cylindrical element | Flat element |
+| ----- | ------------------- | ------------ |
+| 0–2 | center $c$ of the cylinder axis (m) | center $c$ of the face (m) |
+| 3–5 | axis $e_1$ | unit vector $e_1$ in the face |
+| 6–8 | $e_2$, from the axis through the middle of the arc | face normal $e_2$ |
+| 9 | radius $R$ (m) | unused |
+| 10 | half-aperture angle $\theta_{\max}$ (rad) | half-extent $w$ along $e_3 = e_1 \times e_2$ (m) |
+| 11 | half-height $h$ along $e_1$ (m) | half-extent $h$ along $e_1$ (m) |
 
-`translation_rotation_system()`
-builds this array for a rotation + translation scan.
+`translation_rotation_system(..., element="cylinder")` or
+`element="plane"` builds these rows for a rotation + translation scan; the
+flat face lies at the middle of the arc, $c + R e_2$.
+`discretize_cylindrical_transducers()` and
+`discretize_planar_transducers()` sample them into points for `points`.
 
-## Available modes
+## Flat elements
 
-Six forward/adjoint implementations are selected via the `mode` argument of
-`PAT`. `points` applies to any transducer geometry; the five `cylinder_*`
-modes are specific to cylindrically focused elements and take the
-`infos_transducers` array described above.
+### `plane`
 
-### `points`
+For a voxel at distance $d$ from the element plane, the points of the face
+at distance $r$ from the voxel lie on a circle of radius
+$\sqrt{r^2 - d^2}$. The signal in each time step is the area of the face
+between two such circles, divided by $r$. The area of a disk inside a
+rectangle has a closed form, built from the primitive
+$G(a, x) = \tfrac{1}{2}\bigl(x\sqrt{a^2 - x^2} + a^2 \arcsin(x/a)\bigr)$,
+so the only discretization is the time axis shared by all modes.
 
-The transducer surface is discretized into $Q$ point sensors (built with
-`discretize_cylindrical_transducers()`);
-each point contributes a $1/r$-weighted pressure sample, i.e. the surface
-integral is replaced by a quadrature rule. This applies to any geometry and
-is the simplest to implement, but its error carries an extra $O(Q^{-1})$
-quadrature term that the `cylinder_*` modes do not have — those evaluate
-the surface integral in closed form — so accuracy is governed by two
-parameters ($Q$ and `upsample`) instead of one, and fine discretizations
-get expensive.
+## Cylindrical elements
 
 ### `cylinder_exact`
 
@@ -88,28 +102,22 @@ the transducer geometry and the incidence of the wavefront, and grows near
 grazing incidence. In practice this costs about 0.3 dB of reconstruction
 PSNR against `cylinder_exact`.
 
-### `cylinder_planes`
+## Any geometry
 
-Piecewise-planar approximation of the cylinder. The angular aperture
-$[-\theta_{\max}, \theta_{\max}]$ is split into `n_planes_per_cylinder`
-sectors of width $\Delta\theta$, and each sector is replaced by the plane
-tangent to the cylinder at its central angle — a rectangular element of
-half-width $\tfrac{1}{2}R\Delta\theta$ and half-height $h$. The
-contributions of the patches are summed. The error comes from the curvature
-neglected inside each patch and vanishes as $\Delta\theta \to 0$, so
-accuracy is controlled by the user, but the cost grows with the number of
-patches. Measured on the reference geometry it is expensive *and* less
-accurate than `cylinder_lut` (about 0.7 dB of PSNR below
-`cylinder_exact`).
+### `points`
 
-### `cylinder_arcs`
+The element surface is replaced by $Q$ points with their areas; each point
+contributes a $1/r$-weighted pressure sample, i.e. the surface integral is
+replaced by a quadrature rule. This applies to any geometry, including
+shapes without a closed form here, such as spherically focused or annular
+elements: `locPoints` and `area` can come from any sampling of the surface.
+For the two geometries above it converges to the closed-form modes as $Q$
+grows, which makes it the reference for validating them. Its error carries
+an extra $O(Q^{-1})$ quadrature term, so accuracy is governed by two
+parameters ($Q$ and `upsample`) instead of one, and fine discretizations get
+expensive.
 
-The element is decomposed into a stack of `n_arcs_per_cylinder` **arcs at
-fixed heights** along the cylinder axis, each integrated independently over
-the angle. This mode is a validation variant, not one of the operators
-benchmarked in the paper.
-
-## Choosing a mode
+## Choosing a mode for cylindrical elements
 
 Accuracy is quoted as the reconstruction PSNR relative to
 `cylinder_exact`, on the fine noiseless grid of Experiment 1 of the paper;
@@ -120,10 +128,7 @@ speed is relative to `cylinder_lut`.
 | `cylinder_lut` | matches `cylinder_exact` | 1× | **default** for reconstruction |
 | `cylinder_exact` | reference | ~10× slower | reference / validation |
 | `cylinder_trapezoidal` | −0.3 dB | 1.2–1.5× faster | fastest; when the bias is acceptable |
-| `cylinder_planes` (piecewise plane) | −0.7 dB | slower | tunable via `n_planes_per_cylinder` |
-| `points` | −1.2 dB | ~3× slower | arbitrary (non-cylindrical) geometries |
-| `cylinder_arcs` | not benchmarked | moderate | validation variant |
+| `points` | −1.2 dB | ~3× slower | validation; other element shapes |
 
-With 1 % measurement noise the five operators become quantitatively
-comparable; the differences above are visible mainly in the noiseless
-fine-grid regime.
+With 1 % measurement noise these modes become quantitatively comparable;
+the differences above are visible mainly in the noiseless fine-grid regime.
