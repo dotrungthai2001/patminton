@@ -16,8 +16,8 @@ Solvers:
 - :func:`least_squares_CP_TV` — Chambolle-Pock primal-dual with isotropic
   3D total variation, ``u >= 0``.
 
-Metrics: :func:`SNR`, :func:`compute_ssim_3d`, plus per-plane and per-region
-variants.
+Metrics: :func:`SNR`, :func:`PSNR`, :func:`compute_ssim_3d`, plus per-plane
+and per-region variants.
 """
 
 import os
@@ -34,6 +34,17 @@ import torch.nn.functional as F
 def SNR(xref, xest):
     """Signal-to-Noise Ratio in dB."""
     return 10 * torch.log10(torch.sum(xref ** 2) / torch.sum((xest - xref) ** 2))
+
+
+def PSNR(xref, xest, data_range=None):
+    """Peak Signal-to-Noise Ratio in dB: 10 log10(data_range^2 / MSE).
+
+    `data_range` defaults to ``xref.max() - xref.min()``.
+    """
+    if data_range is None:
+        data_range = xref.max() - xref.min()
+    mse = torch.mean((xest - xref) ** 2)
+    return 10 * torch.log10(data_range ** 2 / mse)
 
 
 def SNR_per_plane(xref, xest, dim=2):
@@ -1089,6 +1100,10 @@ def least_squares_CP_TV(pat, s_meas, lam, beta=None, max_iter=1000,
     LS problem:
         min_{u >= 0}  0.5*||A u - s||^2  +  lam*||grad(u)||_{2,1}
 
+    `beta` scales the TV block of K = [A; beta*grad]. Every beta > 0 gives the
+    same minimiser; it only changes the step sizes. None -> ||A|| / ||grad||
+    = sqrt(||A^T A|| / 12), which balances the two blocks.
+
     Returns:
         u, F_list, SNR_list, SSIM_list, elapsed, SNR_planes_history
     """
@@ -1114,8 +1129,11 @@ def least_squares_CP_TV(pat, s_meas, lam, beta=None, max_iter=1000,
     L_A    = estimate_lipschitz(pat, shape, device, dtype, lam=0.0)
     norm_A = L_A ** 0.5
     # pat = pat / norm_A
-    
-    K2     = L_A + 4 * 2 * beta ** 2  
+    if beta is None:
+        beta = (L_A / 12.0) ** 0.5
+
+    # ||grad||^2 <= 4 per axis for forward differences, so 12 in 3D
+    K2     = L_A + 12 * beta ** 2
     norm_K = K2 ** 0.5
 
     if sigma is None: sigma = 0.99 / norm_K
