@@ -1,0 +1,6 @@
+{#-
+  Light and dark variants of the logo. Material hides images whose URL ends
+  in #only-light or #only-dark according to the active color scheme.
+-#}
+<img src="{{ 'assets/logo-mark.png' | url }}#only-light" alt="logo">
+<img src="{{ 'assets/logo-mark-dark.png' | url }}#only-dark" alt="logo">

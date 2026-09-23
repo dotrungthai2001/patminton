@@ -1,10 +1,13 @@
 <p align="center">
-  <img src="assets/logo.png" alt="PATminton — a Python toolbox for photoacoustic tomography" width="440">
+  <img src="assets/logo.png#only-light" alt="PATminton — a GPU-accelerated Python toolbox for 3D photoacoustic tomography" width="600" loading="lazy">
+  <img src="assets/logo-dark.png#only-dark" alt="PATminton — a GPU-accelerated Python toolbox for 3D photoacoustic tomography" width="600" loading="lazy">
 </p>
 
 # patminton
 
-**GPU-accelerated forward and adjoint operators for 3D photoacoustic tomography.**
+**Scalable GPU forward and adjoint operators for 3D photoacoustic tomography that model the transducer spatial impulse response.**
+
+**PAT**minton: **PAT** **M**odels **I**mpleme**NT**ati**ON**.
 
 In photoacoustic tomography (PAT), a short laser pulse illuminates biological
 tissue. The absorbed optical energy causes a rapid thermoelastic expansion
@@ -71,4 +74,5 @@ See the [Quickstart](quickstart.md) for a walk-through.
 If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
-> *"Implementations of photoacoustic tomography models"*, 2026.
+> *"Scalable implementations of photoacoustic tomography models accounting for
+> transducers spatial impulse response"*, 2026.

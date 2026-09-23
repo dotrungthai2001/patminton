@@ -42,3 +42,11 @@ body {
     padding: 0.3rem 0.6rem;
   }
 }
+
+/* Header logo: light and dark variants (overrides/partials/logo.html).
+   Material's own #only-light / #only-dark rules lose to its header logo rule
+   (same specificity, declared later), so restate them more specifically. */
+[data-md-color-scheme="default"] .md-logo img[src$="#only-dark"],
+[data-md-color-scheme="slate"] .md-logo img[src$="#only-light"] {
+  display: none;
+}

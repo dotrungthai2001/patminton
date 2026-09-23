@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="PATminton — a Python toolbox for photoacoustic tomography" width="440">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <img src="docs/assets/logo.png" alt="PATminton — a GPU-accelerated Python toolbox for 3D photoacoustic tomography" width="600">
+  </picture>
 </p>
 
 <p align="center">
@@ -8,10 +11,13 @@
 
 # patminton — GPU-Accelerated 3D Photoacoustic Tomography
 
-CUDA implementations of the forward and adjoint operators of 3D
-photoacoustic tomography (PAT) as on-the-fly matrix-vector products, for
-iterative image reconstruction without storing the system matrix, plus
-CGLS, L-BFGS-B, PGD and Chambolle-Pock TV solvers built on top of them.
+**PAT**minton: **PAT** **M**odels **I**mpleme**NT**ati**ON**.
+
+Scalable GPU implementations of 3D photoacoustic tomography (PAT) models
+that account for the transducer spatial impulse response. The forward and
+adjoint operators are computed on the fly as matrix-vector products, so
+iterative image reconstruction never stores the system matrix. CGLS,
+L-BFGS-B, PGD and Chambolle-Pock TV solvers are built on top of them.
 
 For a 201³ grid observed by 11 520 transducer positions with 1000 time samples,
 the dense system matrix would occupy 201³ × 11 520 × 1000 × 8 B ≈ 750 TB in double
@@ -89,4 +95,5 @@ pytest -m gpu       # operator tests on a CUDA GPU
 If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
-> *"Implementations of photoacoustic tomography models"*, 2026.
+> *"Scalable implementations of photoacoustic tomography models accounting for
+> transducers spatial impulse response"*, 2026.
