@@ -32,7 +32,7 @@ treated as an isolated point source, and the effect of $\phi$ is a single
 signal at transducer $k$ is then
 
 $$
-s_k(t) = [A \mathbf{p}_0]_k(t) * h(t) * e(t)
+s_k(t) = [A \mathbf{p}_0]_k(t) * g(t) * e(t)
 $$
 
 where
@@ -40,17 +40,17 @@ where
 - $A$ is the **acoustic propagation operator**, mapping the discrete
   pressure $\mathbf{p}_0$ to the raw signals at each transducer,
 - $*$ denotes time convolution,
-- $h(t)$ is the **system kernel** carrying the radial function $\phi$,
+- $g(t)$ is the **system kernel** carrying the radial function $\phi$,
 - $e(t)$ is the **Electronic Impulse Response (EIR)** of the transducer,
   its frequency-dependent sensitivity.
 
-The system kernel is $h(t) = -\tfrac{1}{2} c t\, \phi(|ct|)$, supported on
+The system kernel is $g(t) = -\tfrac{1}{2} c t\, \phi(|ct|)$, supported on
 $|ct| \le \kappa$ with $\kappa$ the support radius of $\phi$. `patminton`
-uses the linear (hat) radial function of support $dx$, for which $h$
+uses the linear (hat) radial function of support $dx$, for which $g$
 reduces to
 
 $$
-h(t) \propto dI(ct/dx), \qquad
+g(t) \propto dI(ct/dx), \qquad
 dI(x) = x\,(x\,\mathrm{sign}(x) - 1) \ \text{for } |x| \le 1, \ 0 \text{ otherwise,}
 $$
 
@@ -63,10 +63,10 @@ not in pascals.
 In practice the full forward operator is
 
 $$
-F = \text{Downsample} \circ \text{IFFT} \circ [\,\cdot\, H_f E_f] \circ \text{FFT} \circ \text{Upsample} \circ A
+F = \text{Downsample} \circ \text{IFFT} \circ [\,\cdot\, G_f E_f] \circ \text{FFT} \circ \text{Upsample} \circ A
 $$
 
-where $H_f$ and $E_f$ are the frequency-domain representations of $h$
+where $G_f$ and $E_f$ are the frequency-domain representations of $g$
 and $e$, precomputed once at initialization with cuFFT. The laser pulse
 envelope, when enabled, is folded into the same product.
 
@@ -76,7 +76,7 @@ The adjoint $F^\top$, used by all iterative solvers, mirrors the forward
 pass with conjugate multiplication in the frequency domain:
 
 $$
-F^\top = A^\top \circ \text{IFFT} \circ [\,\cdot\, \overline{H_f E_f}] \circ \text{FFT} \circ \text{Upsample}
+F^\top = A^\top \circ \text{IFFT} \circ [\,\cdot\, \overline{G_f E_f}] \circ \text{FFT} \circ \text{Upsample}
 $$
 
 Adjoint consistency $\langle Fp, s\rangle = \langle p, F^\top s\rangle$ is
@@ -147,7 +147,7 @@ d_su ∈ ℝ^{nTrans×nTu}          upsampled raw signal
     │  cuFFT forward (batched)
     ▼
 d_fs ∈ ℂ^{nTrans×fftNtu}
-    │  × H_f × E_f             pointwise in frequency domain
+    │  × G_f × E_f             pointwise in frequency domain
     ▼
     │  cuFFT inverse (batched)
     ▼
@@ -156,5 +156,5 @@ d_fs ∈ ℂ^{nTrans×fftNtu}
 s  ∈ ℝ^{nTrans×nT}
 ```
 
-The adjoint pass mirrors this with $\overline{H_f E_f}$ and the
+The adjoint pass mirrors this with $\overline{G_f E_f}$ and the
 back-projection kernel `bp_signal_u()`.

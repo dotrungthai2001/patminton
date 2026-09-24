@@ -69,11 +69,38 @@ estimated by power iteration at startup.
 
 ## Metrics
 
-- `SNR()` — signal-to-noise ratio in dB, plus
-  per-plane (`SNR_per_plane()`), masked
-  (`SNR_masked()`) and per-region
-  (`SNR_per_region()`) variants for local quality maps.
-- `PSNR()` — peak signal-to-noise ratio in dB, with the range of the
-  reference as peak value.
-- `compute_ssim_3d()` — 3D SSIM with a
-  Gaussian window.
+The metrics compare a reconstruction $u$ with the reference $\mathbf{p}_0$
+(ground truth, `ref`), both with $N$ voxels.
+
+**SNR.** `SNR()` returns, in dB,
+
+$$
+\mathrm{SNR}(u) = 10 \log_{10} \frac{\|\mathbf{p}_0\|_2^2}{\|u - \mathbf{p}_0\|_2^2}.
+$$
+
+`SNR_per_plane()`, `SNR_masked()` and `SNR_per_region()` apply the same
+formula to each plane along one axis, to the voxels selected by a boolean
+mask, and to each of several named regions, for local quality maps.
+
+**PSNR.** `PSNR()` returns, in dB,
+
+$$
+\mathrm{PSNR}(u) = 10 \log_{10} \frac{d^2}{\mathrm{MSE}(u)},
+\qquad
+\mathrm{MSE}(u) = \frac{1}{N}\|u - \mathbf{p}_0\|_2^2,
+$$
+
+where the peak value $d$ (`data_range`) defaults to the range of the
+reference, $\max_i \mathbf{p}_0[i] - \min_i \mathbf{p}_0[i]$.
+
+**SSIM.** `compute_ssim_3d()` extends the structural similarity index of
+[Wang et al. (2004)](https://doi.org/10.1109/TIP.2003.819861) to 3D. It
+follows their reference implementation
+[`ssim.m`](https://ece.uwaterloo.ca/~z70wang/research/ssim/): Gaussian
+window of size 11 and standard deviation 1.5, constants $K_1 = 0.01$ and
+$K_2 = 0.03$, and downsampling by a factor
+$\max(1, \mathrm{round}(\min(N_x, N_y, N_z)/256))$. The dynamic range
+(`data_range`) defaults to 1, which assumes volumes normalized to $[0, 1]$.
+See the
+[implementation](https://github.com/dotrungthai2001/patminton/blob/main/src/patminton/algorithms.py)
+for details.

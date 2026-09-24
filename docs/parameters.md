@@ -2,7 +2,7 @@
 
 | Parameter | Where | Description |
 | --------- | ----- | ----------- |
-| `upsample` | `PAT.__init__` | Time-axis oversampling factor for the convolution. Larger values give a more accurate convolution with the system kernel $h(t)$ at the cost of GPU memory and longer FFTs. Typical values: 11–51. |
+| `upsample` | `PAT.__init__` | Time-axis oversampling factor for the convolution. Larger values give a more accurate convolution with the system kernel $g(t)$ at the cost of GPU memory and longer FFTs. Typical values: 11–51. |
 | `steps` | `PAT.__init__` | Coarse time-step stride in the smooth regions of the integration loop. Larger is faster but less accurate. Default: `upsample`. |
 | `steps_border` | `PAT.__init__` | Fine time-step stride near the integration boundaries (the arc bounds $\alpha_l$, $\beta_l$ and the support edges). Default: `upsample`; 1 gives maximum accuracy. |
 | `blockSize` | `PAT.__init__` | CUDA thread block edge size (3D blocks of `blockSize`³ threads). Tune for GPU occupancy. |
