@@ -164,7 +164,7 @@ __device__ double Rc(double x, double y)
     // Taylor series expansion to the 7th order
     double E2 = X * Y - Z * Z;
     double E3 = X * Y * Z;
-    return (1 + E3 * (1 / 14 + 3 * E3 / 104) + E2 * (-1 / 10 + E2 / 24 - (3 * E3) / 44 - 5 * E2 * E2 / 208 + E2 * E3 / 16)) / sqrt(An);
+    return (1 + E3 * (1.0 / 14 + 3 * E3 / 104) + E2 * (-1.0 / 10 + E2 / 24 - (3 * E3) / 44 - 5 * E2 * E2 / 208 + E2 * E3 / 16)) / sqrt(An);
  }
 
 
@@ -395,11 +395,11 @@ __device__ double ellint_1(double k, double phi) {
        // but that fails if T has more digits than a long long,
        // so rewritten to use fmod instead:
        //
-       double rphi = fmodf(phi, M_PI_2) ;
+       double rphi = fmod(phi, M_PI_2) ;
        double m = round((phi - rphi)/M_PI_2) ;
 
        int s = 1;
-       if(fmodf(m,2) > 0.5 ) {
+       if(fmod(m, 2.0) > 0.5 ) {
           m += 1;
           s = -1;
           rphi = M_PI_2 - rphi;
@@ -497,11 +497,11 @@ __device__ double ellint_2(double k, double phi)
        // but that fails if T has more digits than a long long,
        // so rewritten to use fmod instead:
        //
-       double rphi = fmodf(phi,M_PI_2) ;
+       double rphi = fmod(phi,M_PI_2) ;
        double m = round((phi - rphi)/M_PI_2) ;
 
        int s = 1;
-       if(fmodf(m,2) > 0.5 ) {
+       if(fmod(m, 2.0) > 0.5 ) {
           m += 1;
           s = -1;
           rphi = M_PI_2 - rphi;

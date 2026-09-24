@@ -901,11 +901,19 @@ __device__ void splitZDomain(double zl, double h, double Zsq[2][2], int &n_upsil
 	}
 }
 
+// True when the arrival [rmin, rmax] / c lies entirely outside the time
+// window. The clamped time indices would then put the whole patch area on an
+// edge sample, or write to index -1 when the arrival ends before tStart.
+__device__ __forceinline__ bool outsideWindow(double rmin, double rmax, double c,
+					double tStart, double dt, int nT) {
+	return (ceil((rmax / c - tStart) / dt) <= 0) || (floor((rmin / c - tStart) / dt) >= nT) ;
+}
+
 // =============================================
 // === Cylindrical transducers with Elliptic ===
 // =============================================
 
-template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					const double* const infos_transducers,
@@ -1049,6 +1057,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int 
 					ralpha = sqrt(Dsq + Rsq + Zsq_max - twoRD*cos_theta_min) ;
                     rbeta = sqrt(Dsq + Rsq + Zsq_min - twoRD*cos_theta_max) ;
 
+					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT-1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT-1), 0)  ;
 					it_alpha = max(min((int)floor((ralpha / c - tStart) / dt), nT-1), 0);
@@ -1065,7 +1074,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int 
 					// value_prev = 0.0 // for linear interp
 					// step_prev = 0.0 // for linear interp
 
-					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+					for (itime = it_min ; itime < it_max ; ) {
 					    // first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
                         // then every upsample iteration compute area
                         // last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1188,7 +1197,7 @@ template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Trapezoida
                     const bool use_sparse_optimization,
                     double p[], double s[]) ;
 
-template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 				int nTrans,
 				double tStart, int nT, double dt, double c,
 				const double* const infos_transducers,
@@ -1329,6 +1338,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int
 					ralpha = sqrt(Dsq + Rsq + Zsq_max - twoRD*cos_theta_min) ;
                     rbeta = sqrt(Dsq + Rsq + Zsq_min - twoRD*cos_theta_max) ;
 
+					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT-1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT-1), 0)  ;
 					it_alpha = max(min((int)floor((ralpha / c - tStart) / dt), nT-1), 0);
@@ -1346,7 +1356,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int
 					// value_prev = 0.0 // for linear interp
 					// step_prev = 0.0 // for linear interp
 
-					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+					for (itime = it_min ; itime < it_max ; ) {
 					    // first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
                         // then every upsample iteration compute area
                         // last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1802,6 +1812,7 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
 					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
+					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
 					it_min_upsample = upsample * (it_min / upsample + 1);
@@ -1811,7 +1822,7 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 					xalpha = Xmin;
 					xbeta = Xmin;
 
-					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+					for (itime = it_min ; itime < it_max ; ) {
 						// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
 						// then every upsample iteration compute area
 						// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1820,6 +1831,7 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 							: (itime >= it_max_upsample)
 								? min(steps_border, it_max - 1 - itime + 1)
 								: steps;
+						step = min(step, it_max - itime + 1) ; // do not step past it_max
 
 						time = tStart + itime * dt;
 						time_next = time + step*dt;
@@ -1975,6 +1987,7 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
 					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
+					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
 					it_min_upsample = upsample * (it_min / upsample + 1);
@@ -1984,7 +1997,7 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 					xalpha = Xmin;
 					xbeta = Xmin;
 
-					for (itime = it_min ; itime < (it_max_upsample-1) ; ) {
+					for (itime = it_min ; itime < it_max ; ) {
 						// first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
 						// then every upsample iteration compute area
 						// last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1993,6 +2006,7 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 							: (itime >= it_max_upsample)
 								? min(steps_border, it_max - 1 - itime + 1)
 								: steps;
+						step = min(step, it_max - itime + 1) ; // do not step past it_max
 
 						time = tStart + itime * dt;
 						time_next = time + step*dt;

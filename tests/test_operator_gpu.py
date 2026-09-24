@@ -37,7 +37,7 @@ N = 32                      # grid voxels per axis
 L = 2e-3                    # grid half-extent (m)
 NT = 256
 DT = 25e-9
-TSTART = 13e-6              # transducers at ~25 mm -> arrivals ~14.9-17.5 us
+TSTART = 17.5e-6            # window 17.5-23.9 us covers every arrival (18.4-23.2 us)
 C = 1540.0
 RADIUS = 25e-3
 HEIGHT = 7.5e-3
@@ -168,3 +168,18 @@ def test_plane_matches_points(plane_infos):
     coarse, fine = rel_err(15, 3), rel_err(151, 7)
     assert fine < coarse
     assert fine < 0.2
+
+
+@pytest.mark.parametrize("mode", ["cylinder_lut", "cylinder_exact", "plane"])
+def test_models_match_point_quadrature(mode, infos, plane_infos):
+    """With one SIR evaluation per upsampled sample (steps=1), the analytic
+    models match a fine point quadrature of the same element surfaces."""
+    p = torch.zeros((N, N, N), dtype=torch.float64, device=DEVICE)
+    p[N // 2, N // 2, N // 2] = 1.0
+    if mode == "plane":
+        elements, discretize = plane_infos, patminton.discretize_planar_transducers
+    else:
+        elements, discretize = infos, patminton.discretize_cylindrical_transducers
+    s = make_pat(mode, elements, steps=1, steps_border=1) @ p
+    s_ref = make_pat("points", None, points=discretize(elements, 151, 7)) @ p
+    assert ((s - s_ref).norm() / s_ref.norm()).item() < 1e-2

@@ -70,9 +70,13 @@ __device__ void splitZDomain(double zl, double h, double Zsq[2][2], int &n_upsil
 // === Cylindrical transducers with Elliptic ===
 // =============================================
 
+// Largest thread block the kernels below accept: blockSize = 8 (the default)
+// gives 8^3 = 512 threads. With one block per SM, this caps registers at 128
+// per thread; without it the Exact kernels use up to 154 and fail to launch.
+#define ELLIPTIC_MAX_THREADS 512
 
 /// Forward operator using elliptic integrals (with bilinear-interpolated LUTs)
-template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
     				int nTrans,
     				double tStart, int nT, double dt, double c,
 					const double* const infos_transducers,
@@ -85,7 +89,7 @@ template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int 
 					double d_p[], double d_s []);
 
 /// Adjoint operator using elliptic integrals (with LUTs)
-template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 				int nTrans,
 				double tStart, int nT, double dt, double c,
 				const double* const infos_transducers,
