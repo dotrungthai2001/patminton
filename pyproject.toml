@@ -10,12 +10,17 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]
+# Names only: an author given with an email is moved to the Author-email field
+# and left out of the Author field that PyPI displays.
 authors = [
-    { name = "Trung-Thai Do", email = "trungthai1771@gmail.com" },
+    { name = "Trung-Thai Do" },
     { name = "Paul Escande" },
     { name = "Caroline Chaux" },
     { name = "Jérôme Gateau" },
     { name = "Hwee Kuan Lee" },
+]
+maintainers = [
+    { name = "Trung-Thai Do", email = "trungthai1771@gmail.com" },
 ]
 keywords = ["photoacoustic", "tomography", "CUDA", "inverse-problems", "imaging"]
 classifiers = [
@@ -30,6 +35,9 @@ dependencies = [
     "numpy",
     "scipy",
     "torch",
+    # libcufft.so.11 for the prebuilt wheel (CUDA 12.8). The default PyTorch
+    # wheel ships only libcufft.so.12 (CUDA 13).
+    "nvidia-cufft-cu12; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [project.urls]
@@ -37,10 +45,10 @@ Documentation = "https://patminton.readthedocs.io/"
 Source = "https://github.com/dotrungthai2001/patminton"
 
 [project.optional-dependencies]
-# libpat_gpu.so links dynamically against libcufft. The CUDA toolkit provides
-# it; these extras pull it from PyPI instead, for installs from a wheel on a
-# machine without the toolkit. Pick the extra matching the CUDA major version
-# the wheel was built with (reported by "pip show patminton").
+# libpat_gpu.so links dynamically against libcufft. For a build from source,
+# the CUDA toolkit provides it; these extras pull it from PyPI instead when the
+# toolkit's copy is not on the loader path. Pick the extra matching the CUDA
+# major version of the nvcc used for the build.
 cuda12 = [
     "nvidia-cufft-cu12",
 ]

@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
-    <img src="docs/assets/logo.png" alt="PATminton — a GPU-accelerated Python toolbox for 3D photoacoustic tomography" width="600">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dotrungthai2001/patminton/main/docs/assets/logo-dark.png">
+    <img src="https://raw.githubusercontent.com/dotrungthai2001/patminton/main/docs/assets/logo.png" alt="PATminton — a GPU-accelerated Python toolbox for 3D photoacoustic tomography" width="600">
   </picture>
 </p>
 
@@ -29,11 +29,11 @@ precision; `patminton` applies it and its adjoint on the fly on the GPU instead.
 pip install patminton
 ```
 
-Requirements: a CUDA-capable NVIDIA GPU (compute capability ≥ 7.0) and
-Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel built with
-CUDA 12.8 and needs no CUDA toolkit. It uses cuFFT from a CUDA 12 toolkit or
-a CUDA 12 build of PyTorch; otherwise, including with the default PyTorch
-wheel (CUDA 13), install it with `pip install patminton[cuda12]`.
+Requirements: a CUDA-capable NVIDIA GPU (compute capability ≥ 7.0), an NVIDIA
+driver ≥ 525, and Python ≥ 3.9. On Linux x86-64 this installs a prebuilt wheel
+built with CUDA 12.8, which needs no CUDA toolkit and works with both CUDA 12
+and CUDA 13 drivers and PyTorch builds. Its cuFFT dependency
+(`libcufft.so.11`) is installed from PyPI.
 
 Installing from source instead requires the CUDA toolkit (`nvcc` ≥ 11 on
 PATH), which compiles the library for every supported architecture. To target
