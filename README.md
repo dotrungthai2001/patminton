@@ -11,7 +11,7 @@
 
 # patminton — GPU-Accelerated 3D Photoacoustic Tomography
 
-**PAT**minton: **PAT** **M**odels **I**mpleme**NT**ati**ON**.
+**PAT**minton: **PAT** **M**atrix-free **I**mpleme**NT**ati**ON**.
 
 Scalable GPU implementations of 3D photoacoustic tomography (PAT) models
 that account for the transducer spatial impulse response. The forward and

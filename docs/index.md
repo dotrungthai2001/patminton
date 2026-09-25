@@ -7,7 +7,7 @@
 
 **Scalable GPU forward and adjoint operators for 3D photoacoustic tomography that model the transducer spatial impulse response.**
 
-**PAT**minton: **PAT** **M**odels **I**mpleme**NT**ati**ON**.
+**PAT**minton: **PAT** **M**atrix-free **I**mpleme**NT**ati**ON**.
 
 In photoacoustic tomography (PAT), a short laser pulse illuminates biological
 tissue. The absorbed optical energy causes a rapid thermoelastic expansion
