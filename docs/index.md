@@ -46,7 +46,8 @@ tractable on a single GPU.
 
 ```python
 import torch
-from patminton import PAT, translation_rotation_system, least_squares_CG
+from patminton import (PAT, translation_rotation_system, normalize_operator,
+                       least_squares_LBFGSB)
 
 infos = translation_rotation_system(
     transducer_radius=25e-3, transducer_height=7.5e-3,
@@ -64,7 +65,9 @@ p[100, 100, 100] = 1.0
 
 s = pat @ p          # forward
 p_bp = pat.T @ s     # adjoint
-u, *_ = least_squares_CG(pat, s, M_inv=None, max_iter=50, lam=1e-4)
+# rescale to unit operator norm, then non-negative least squares (u >= 0)
+pat_n, s_n, _ = normalize_operator(pat, s, p.shape)
+u, *_ = least_squares_LBFGSB(pat_n, s_n, M_inv=None, max_iter=50, lam=1e-4)
 ```
 
 See the [Quickstart](quickstart.md) for a walk-through.

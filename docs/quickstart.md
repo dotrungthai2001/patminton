@@ -105,9 +105,9 @@ pat_n, s_n, norm_A = normalize_operator(pat, s, p.shape)
 ## Reconstruct
 
 ```python
-from patminton import least_squares_CG
+from patminton import least_squares_LBFGSB
 
-u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_CG(
+u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_LBFGSB(
     pat_n, s_n,
     M_inv=None,      # optional diagonal preconditioner
     max_iter=100,
@@ -118,9 +118,8 @@ u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_CG(
 )
 ```
 
-For non-negative reconstructions use
-`least_squares_LBFGSB()` or
-`least_squares_PGD()`; for total
-variation use
+L-BFGS-B enforces $u \ge 0$. Without that constraint use
+`least_squares_CG()`; `least_squares_PGD()` is another
+non-negative solver; for total variation use
 `least_squares_CP_TV()`.
 See [Reconstruction algorithms](solvers.md).

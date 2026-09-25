@@ -1,13 +1,15 @@
-"""Point-phantom example: forward simulation, adjoint test, CGLS reconstruction.
+"""Point-phantom example: forward simulation, adjoint test, L-BFGS-B reconstruction.
 
-Runs on a small 64^3 grid so it fits on a laptop GPU in a few seconds.
+Runs on a small 64^3 grid. patminton computes in float64, so even this takes
+minutes on a data-centre GPU (V100, A100, H100); consumer GPUs run float64 at a
+small fraction of their float32 rate and are much slower.
 """
 
 import torch
 
 from patminton import (
     PAT,
-    least_squares_CG,
+    least_squares_LBFGSB,
     normalize_operator,
     translation_rotation_system,
 )
@@ -59,13 +61,18 @@ rhs = torch.sum(x * (pat.T @ y))
 print(f"adjoint relative gap: {abs(lhs - rhs) / abs(lhs):.2e}")
 
 # --- reconstruction -------------------------------------------------------
-# In raw physical units ||A^T A|| ~ 1e-15, so any usual Tikhonov weight
-# would swamp the data term; rescale the operator to unit norm first.
-pat_n, s_n, norm_A = normalize_operator(pat, s, p.shape)
+# In raw physical units ||A|| ~ 3e-6 here, so any usual Tikhonov weight would
+# swamp the data term; rescale the operator to unit norm first. The norm only
+# sets the scale: 5 power iterations suffice, as in the paper's runs.
+pat_n, s_n, norm_A = normalize_operator(pat, s, p.shape, n_iter=5)
 print(f"operator norm: {norm_A:.3e}")
 
-u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_CG(
-    pat_n, s_n, M_inv=None, max_iter=30, lam=1e-4, ref=p, patience=10, verbose=True
+# Non-negative least squares (u >= 0) with Tikhonov weight lam, the solver
+# used in the paper. Each function evaluation costs one A and one A^T.
+status = {}
+u, F_list, SNR_list, SSIM_list, elapsed, _ = least_squares_LBFGSB(
+    pat_n, s_n, M_inv=None, max_iter=30, lam=1e-4, ref=p, verbose=True,
+    status=status,
 )
-print(f"CGLS: {len(F_list)} iterations in {elapsed:.1f} s, "
-      f"final SNR = {SNR_list[-1]:.2f} dB")
+print(f"L-BFGS-B: {status['n_iter']} iterations, {status['nfev']} evaluations "
+      f"in {elapsed:.1f} s, final SNR = {SNR_list[-1]:.2f} dB")
