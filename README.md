@@ -98,5 +98,5 @@ pytest -m gpu       # operator tests on a CUDA GPU
 If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
-> *"Scalable implementations of photoacoustic tomography models accounting for
-> transducers spatial impulse response"*, 2026.
+> *"Scalable photoacoustic tomography implementations accounting for the spatial
+> impulse response of transducers"*, 2026.

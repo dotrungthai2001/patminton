@@ -5,8 +5,10 @@
 - An NVIDIA GPU with compute capability ≥ 7.0, and a driver recent enough for
   the CUDA version of the build (≥ 525 for CUDA 12, ≥ 580 for CUDA 13)
 - Python ≥ 3.9
-- Linux x86-64 for the prebuilt wheel; any platform with the CUDA toolkit
-  when building from source
+- Linux: x86-64 for the prebuilt wheel (glibc ≥ 2.28, e.g. Ubuntu ≥ 20.04);
+  other Linux systems by building from source (tested on x86-64 only).
+  Windows and macOS are not supported: the build produces a Linux shared
+  library (`libpat_gpu.so`), and macOS has no CUDA
 
 Python dependencies (`numpy`, `scipy`, `torch`) are installed automatically.
 PyTorch must be able to see the GPU (`torch.cuda.is_available()`).
@@ -39,8 +41,8 @@ pip install patminton[cuda13]     # libcufft.so.12
 
 ### Building from source
 
-On any other platform, or with `pip install --no-binary patminton`, pip
-compiles the CUDA library. This needs the CUDA toolkit (≥ 11, tested with
+On another Linux system, or with `pip install --no-binary patminton`,
+pip compiles the CUDA library. This needs the CUDA toolkit (≥ 11, tested with
 12.x and 13.x) with `nvcc` on `PATH`; no GPU has to be visible at build time.
 Expect about 70 s for the default architecture list.
 
