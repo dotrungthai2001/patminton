@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Read the Docs serves this file as index.html and 404.html (see
+     .readthedocs.yaml), so every old link
+     https://patminton.readthedocs.io/<lang>/<version>/<page>
+     is forwarded to the same page on GitHub Pages. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>patminton documentation has moved</title>
+  <meta name="robots" content="noindex">
+  <script>
+    // "/en/latest/installation/" -> "installation/"
+    var page = location.pathname.split("/").slice(3).join("/");
+    location.replace("https://dotrungthai2001.github.io/patminton/" + page + location.hash);
+  </script>
+  <noscript>
+    <meta http-equiv="refresh" content="0; url=https://dotrungthai2001.github.io/patminton/">
+  </noscript>
+</head>
+<body>
+  <p>The patminton documentation has moved to
+    <a href="https://dotrungthai2001.github.io/patminton/">dotrungthai2001.github.io/patminton</a>.</p>
+</body>
+</html>

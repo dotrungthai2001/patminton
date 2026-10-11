@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://patminton.readthedocs.io/"
+Documentation = "https://dotrungthai2001.github.io/patminton/"
 Source = "https://github.com/dotrungthai2001/patminton"
 
 [project.optional-dependencies]

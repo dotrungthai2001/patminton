@@ -1,6 +1,6 @@
 site_name: patminton
 site_description: Scalable GPU forward and adjoint operators for 3D photoacoustic tomography that model the transducer spatial impulse response
-site_url: https://patminton.readthedocs.io/
+site_url: https://dotrungthai2001.github.io/patminton/
 repo_url: https://github.com/dotrungthai2001/patminton
 copyright: Copyright &copy; 2026 the patminton authors
 
@@ -40,6 +40,7 @@ nav:
 
 exclude_docs: |
   requirements.txt
+  rtd-redirect.html
   assets/logo-source.jpg
 
 markdown_extensions:

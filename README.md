@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://patminton.readthedocs.io/"><img src="https://readthedocs.org/projects/patminton/badge/?version=latest" alt="Documentation"></a>
+  <a href="https://dotrungthai2001.github.io/patminton/"><img src="https://github.com/dotrungthai2001/patminton/actions/workflows/docs.yml/badge.svg" alt="Documentation"></a>
 </p>
 
 # patminton — GPU-Accelerated 3D Photoacoustic Tomography
@@ -74,7 +74,7 @@ u, *_ = least_squares_LBFGSB(pat_n, s_n, M_inv=None, max_iter=50, lam=1e-4)
 
 ## Documentation
 
-**[patminton.readthedocs.io](https://patminton.readthedocs.io/)** — installation, quickstart, physical and
+**[dotrungthai2001.github.io/patminton](https://dotrungthai2001.github.io/patminton/)** — installation, quickstart, physical and
 mathematical model, transducer models, reconstruction algorithms and key
 parameters.
 
