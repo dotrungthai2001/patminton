@@ -78,4 +78,5 @@ If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
 > *"Scalable photoacoustic tomography implementations accounting for the spatial
-> impulse response of transducers"*, 2026.
+> impulse response of transducers"*, 2026. HAL preprint
+> [hal-05762160](https://hal.science/hal-05762160/).

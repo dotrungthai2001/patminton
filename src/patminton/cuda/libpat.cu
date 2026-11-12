@@ -1,6 +1,7 @@
 #include "include/pat.h"
 #include "pat.h"
 #include "pat_types.h"
+#include <cstdio>
 
 extern "C" {
 
@@ -90,5 +91,33 @@ extern "C" {
 
 	void PMVT(PAT *pat, double d_p[], double d_s[]) {
 		pat->PMVT(d_p, d_s) ;
+	}
+
+	void getSignalU(PAT *pat, double d_su[]) {
+		pat->getSignalU(d_su) ;
+	}
+
+	void computeSignalU(PAT *pat, double d_p[], double d_su[]) {
+		pat->computeSignalU(d_p, d_su) ;
+	}
+
+	int getNtu(PAT *pat) {
+		return pat->getNtu() ;
+	}
+
+	void getKernel(PAT *pat, double d_fg[]) {
+		pat->getKernel(d_fg) ;
+	}
+
+	// returns 0 on success, 1 if pat is not an elliptic cylinder model
+	// (PAT_plane derives from PAT_cylinder but its kernels ignore the map)
+	int setStepsMap(PAT *pat, int steps[], double x[], double y[], double z[], int nx, int ny, int nz) {
+		PAT_cylinder *pat_cylinder = dynamic_cast<PAT_cylinder*>(pat) ;
+		if (pat_cylinder == nullptr || dynamic_cast<PAT_plane*>(pat) != nullptr) {
+			printf("setStepsMap: only for the elliptic cylinder models\n") ;
+			return 1 ;
+		}
+		pat_cylinder->setStepsMap(steps, x, y, z, nx, ny, nz) ;
+		return 0 ;
 	}
 };

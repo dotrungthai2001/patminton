@@ -9,8 +9,6 @@
   <a href="https://patminton.readthedocs.io/"><img src="https://readthedocs.org/projects/patminton/badge/?version=latest" alt="Documentation"></a>
 </p>
 
-# patminton — GPU-Accelerated 3D Photoacoustic Tomography
-
 **PAT**minton: **P**hoto**A**coustic **T**omography **M**atrix-free **I**mpleme**NT**ati**ON**.
 
 Scalable GPU implementations of 3D photoacoustic tomography (PAT) models
@@ -99,4 +97,5 @@ If you use this package, please cite:
 
 > Trung-Thai Do, Paul Escande, Caroline Chaux, Jérôme Gateau, Hwee Kuan Lee —
 > *"Scalable photoacoustic tomography implementations accounting for the spatial
-> impulse response of transducers"*, 2026.
+> impulse response of transducers"*, 2026. HAL preprint
+> [hal-05762160](https://hal.science/hal-05762160/).

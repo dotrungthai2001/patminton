@@ -2,6 +2,7 @@
 #define __PAT__
 
 #include <cufft.h>
+#include "pat_types.h"
 
 ///////////////////////////////////////////////////////////
 /// Class representing the photoacoustic experiment and implements
@@ -85,6 +86,20 @@ class PAT {
     	void PMV(double p[], double s[]) ;
     	void PMVT(double p[], double s[]) ;
 
+		// Access to the upsampled signal buffer d_su_ (GPU, nTransducers x nTu, row-major).
+		// getSignalU: copies d_su_ as it is. After PMV it holds the convolved upsampled
+		//   signal WITHOUT the 1/nTu FFT scaling; after PMVT the scaled correlated signal
+		//   (elliptic cylinder modes: its suffix sums over time, see PAT_cylinder::scanSignalU).
+		// computeSignalU: zeroes d_su_, runs only compute_signal_u(d_p) (no convolution)
+		//   and copies the result.
+		void getSignalU(double d_su[]) ;
+		void computeSignalU(double d_p[], double d_su[]) ;
+		int getNtu() const { return nTu_ ; }
+		// Copies the convolution kernel d_fg_ (GPU, fftNtu_ = nTu/2+1 complex values, i.e.
+		// interleaved real / imaginary parts): unnormalized FFT of the time kernel on the
+		// upsampled grid (spherical-mean derivative * laser pulse * EIR).
+		void getKernel(double d_fg[]) ;
+
 } ;
 
 class PAT_points : public PAT {
@@ -109,8 +124,18 @@ class PAT_points : public PAT {
 class PAT_cylinder : public PAT{
 	protected: // Cylinder param
 		double *d_infos_transducers_ ;
-		int steps_border_ ;
+		int steps_border_ ;	// <= 0: same as the steps of the voxel
 		int steps_ ;
+		// optional map of steps in the transducer frame (used by the elliptic kernels instead of steps_)
+		int *d_steps_map_ ;
+		double *d_steps_map_x_, *d_steps_map_y_, *d_steps_map_z_ ;
+		int steps_map_nx_, steps_map_ny_, steps_map_nz_ ;
+		StepsMap stepsMap() const ; // device view of the map (steps = nullptr if no map)
+		// The elliptic kernels write the jumps of the upsampled signal (one per block of time steps)
+		// instead of every bin: compute_signal_u takes the prefix sums of d_su_ after the kernel
+		// (reverse = false), bp_signal_u takes its suffix sums before the kernel (reverse = true).
+		void scanSignalU(bool reverse) ;
+		void freeStepsMap() ;
 
 
 	public:
@@ -123,6 +148,12 @@ class PAT_cylinder : public PAT{
 			bool use_sparse_optimization
 		);
     	virtual ~PAT_cylinder();
+		// Steps map: steps (nx, ny, nz) row-major, ints >= 1, at the nodes x (nx), y (ny), z (nz)
+		// (increasing) of the local frame of the transducers (x along e2, y along e1 x e2, z along
+		// e1, origin at the transducer center). Each voxel uses the steps of the nearest node, for
+		// every transducer. Host pointers, copied to the device. Replaces any previous map.
+		void setStepsMap(const int *steps, const double *x, const double *y, const double *z,
+		                 int nx, int ny, int nz) ;
 
 	protected:
     	// Still virtual methods (no implementations)
@@ -132,7 +163,8 @@ class PAT_cylinder : public PAT{
 } ;
 
 // Flat rectangular elements. PAT_cylinder only stores the 12-column element
-// rows and the integration steps, which the planar model shares.
+// rows and the integration steps, which the planar model shares (its kernels
+// ignore the steps map and write every bin).
 class PAT_plane : public PAT_cylinder {
     public:
        PAT_plane( int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
