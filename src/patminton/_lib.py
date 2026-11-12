@@ -11,7 +11,7 @@ useful to point the package at a library built manually with ``make``.
 """
 
 import os
-from ctypes import CDLL, POINTER, RTLD_GLOBAL, c_char
+from ctypes import CDLL, POINTER, RTLD_GLOBAL, c_char, c_int
 from pathlib import Path
 
 _CREATORS = (
@@ -97,5 +97,7 @@ def get_lib():
     # The constructors return an opaque pointer to the C++ PAT instance.
     for name in _CREATORS:
         getattr(lib, name).restype = POINTER(c_char)
+    lib.getNtu.restype = c_int
+    lib.setStepsMap.restype = c_int  # 0 on success, 1 if the model takes no steps map
     _lib = lib
     return _lib

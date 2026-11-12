@@ -25,6 +25,28 @@ MODES = (
 )
 """Available transducer models (values of the ``mode`` argument)."""
 
+_STEPS_MAP_MODES = ("cylinder_exact", "cylinder_lut", "cylinder_trapezoidal")
+# models whose kernels read a steps map (see PAT.set_steps_map)
+
+
+def _steps_map_arrays(steps_map, steps_coords):
+    """Check a steps map and return it as the contiguous arrays passed to the
+    CUDA library: ``(steps_map int32 (nx, ny, nz), [x, y, z] float64)``."""
+    steps_map = np.ascontiguousarray(steps_map, dtype=np.int32)
+    coords = [np.ascontiguousarray(np.ravel(x), dtype=np.float64) for x in steps_coords]
+    if steps_map.ndim != 3 or len(coords) != 3:
+        raise ValueError("steps_map must be 3D and steps_coords = (x, y, z)")
+    if tuple(x.size for x in coords) != steps_map.shape:
+        raise ValueError(
+            f"steps_coords sizes {tuple(x.size for x in coords)} do not match "
+            f"steps_map {steps_map.shape}"
+        )
+    if any(np.any(np.diff(x) <= 0) for x in coords):
+        raise ValueError("steps_coords must be strictly increasing")
+    if steps_map.min() < 1:
+        raise ValueError("steps must be >= 1")
+    return steps_map, coords
+
 
 class PAT:
     """Photoacoustic forward/adjoint operator on the GPU.
@@ -69,10 +91,15 @@ class PAT:
             the system kernel of the radial basis function. Larger is more
             accurate but uses more GPU memory. Typical values: 11-51.
         steps: Coarse time-step stride in the smooth regions of the
-            integration loop. Defaults to ``upsample``.
+            integration loop. Defaults to ``upsample``. For the
+            ``cylinder_*`` modes, ``steps`` can also be a 3D integer array:
+            a map of steps in the element frame, read at the nodes
+            ``steps_coords`` (see :meth:`set_steps_map`).
         steps_border: Fine stride near the integration boundaries
-            (singularities). Defaults to ``upsample``; 1 gives maximum
-            accuracy.
+            (singularities). Defaults to ``upsample``, or to the step of
+            each voxel when ``steps`` is a map; 1 gives maximum accuracy.
+        steps_coords: ``(x, y, z)`` node coordinates (m) of the map given
+            as ``steps``.
         blockSize: CUDA thread block edge size (3D blocks of
             ``blockSize**3`` threads).
         laser_pulse_variance: Standard deviation (s) of the Gaussian envelope
@@ -121,6 +148,7 @@ class PAT:
         upsample=11,
         steps=None,
         steps_border=None,
+        steps_coords=None,
         blockSize=8,
         laser_pulse_variance=5e-9,
         eir=None,
@@ -147,9 +175,13 @@ class PAT:
         self.Ny = Ny
         self.Nz = Nz
         self.nT = nT
+        self.dt = dt
+        self.upsample = upsample
+        self.mode = mode
         self.transpose = False
 
         ptr_eir = None
+        self.eir_padded = None  # EIR as passed to the CUDA library (length nT, center at index 0)
         # preprocessing eir: zero-padding the EIR to match the grid size: ease FFT in cuda
         if eir is not None:
             eir_padded = np.zeros(nT)
@@ -158,6 +190,22 @@ class PAT:
             eir_padded[-(eir.shape[0] - split) :] = eir[split:]
             eir_padded = np.ascontiguousarray(eir_padded)
             ptr_eir = eir_padded.ctypes.data_as(POINTER(c_double))
+            self.eir_padded = eir_padded
+
+        steps_map = None
+        if steps is not None and np.ndim(steps) > 0:
+            # map of steps: one value per voxel, read in the transducer frame
+            if mode not in _STEPS_MAP_MODES:
+                raise ValueError(
+                    "a steps map is only supported by 'cylinder_exact', "
+                    "'cylinder_lut' and 'cylinder_trapezoidal'"
+                )
+            if steps_coords is None:
+                raise ValueError("a steps map needs steps_coords = (x, y, z)")
+            steps_map, steps_coords = _steps_map_arrays(steps, steps_coords)
+            steps = int(steps_map.max())  # scalar steps of the C++ object, unused with a map
+            if steps_border is None:
+                steps_border = 0  # 0: steps_border = steps of the voxel, read in the map
 
         if mode == "points" and locPoints is not None:
             nTrans = locPoints.shape[0]
@@ -324,6 +372,9 @@ class PAT:
                     ptr_eir,
                     c_bool(use_sparse_optimization),
                 )
+
+            if steps_map is not None:
+                self.set_steps_map(steps_map, steps_coords)
         else:
             raise ValueError(
                 "mode should be 'points', 'plane', 'cylinder_exact', "
@@ -333,6 +384,46 @@ class PAT:
     def __del__(self):
         if getattr(self, "instance", None) is not None:
             self._lib.destroyPAT(self.instance)
+
+    def set_steps_map(self, steps_map, steps_coords):
+        """Use a map of steps instead of the scalar ``steps``.
+
+        For each element, every voxel is converted to the local frame of that
+        element and uses the step of the nearest node of the map (positions
+        outside the map take the value of its border), so one map serves all
+        elements of the same shape. ``steps_border`` keeps the value set at
+        construction: with a map passed to the constructor and
+        ``steps_border=None``, each voxel uses its own step there too.
+        Replaces any previous map.
+
+        Args:
+            steps_map: ``(nx, ny, nz)`` integers >= 1, the steps in upsampled
+                time bins (``dt / upsample``).
+            steps_coords: ``(x, y, z)`` strictly increasing 1D arrays of
+                sizes ``nx``, ``ny``, ``nz``: node coordinates (m) in the
+                element frame, with x along ``e2`` (toward the middle of the
+                arc), y along ``e1 x e2``, z along the cylinder axis ``e1``,
+                and the origin at the cylinder center ``c``.
+
+        Raises:
+            ValueError: If the mode is not ``cylinder_exact``,
+                ``cylinder_lut`` or ``cylinder_trapezoidal``, or the arrays
+                are malformed.
+        """
+        if self.mode not in _STEPS_MAP_MODES:
+            raise ValueError(
+                "a steps map is only supported by 'cylinder_exact', "
+                "'cylinder_lut' and 'cylinder_trapezoidal'"
+            )
+        steps_map, coords = _steps_map_arrays(steps_map, steps_coords)
+        if self._lib.setStepsMap(
+            self.instance,
+            steps_map.ctypes.data_as(POINTER(c_int)),
+            *[x.ctypes.data_as(c_double_p) for x in coords],
+            *[c_int(n) for n in steps_map.shape],
+        ):
+            raise ValueError("steps map only for the elliptic cylinder models")
+        self.steps_map, self.steps_coords = steps_map, coords
 
     def checkEntry(self, p, t):
         """Check that a tensor is a contiguous float64 CUDA tensor of shape ``t``."""
@@ -380,6 +471,103 @@ class PAT:
             s, (self.nTrans, self.nT)
         ):
             self._lib.PMVT(self.instance, c_void_p(p.data_ptr()), c_void_p(s.data_ptr()))
+
+    @property
+    def nTu(self):
+        """Number of upsampled time samples, ``upsample * nT``."""
+        return self._lib.getNtu(self.instance)
+
+    def get_signal_u(self, su=None):
+        """Copy of the upsampled signal buffer ``d_su_``, ``(nTrans, nTu)``.
+
+        After a forward product it holds the convolved upsampled signal,
+        without the ``1 / nTu`` FFT scaling:
+        ``s = su.reshape(nTrans, nT, upsample).mean(-1) / nTu``. After an
+        adjoint product it holds the scaled correlated signal fed to the
+        back-projection; for the ``cylinder_*`` modes, its suffix sums over
+        time, which their back-projection reads.
+
+        Args:
+            su: Optional preallocated ``(nTrans, nTu)`` float64 CUDA tensor,
+                filled in place.
+
+        Returns:
+            The tensor ``su``.
+        """
+        if su is None:
+            su = torch.empty((self.nTrans, self.nTu), device="cuda", dtype=torch.float64)
+        if self.checkEntry(su, (self.nTrans, self.nTu)):
+            self._lib.getSignalU(self.instance, c_void_p(su.data_ptr()))
+        return su
+
+    def compute_signal_u(self, p, su=None):
+        """Upsampled signal before the convolution with the system kernel.
+
+        Runs only the geometry kernel, so that ``pat @ p`` equals
+        ``irfft(rfft(u) * get_kernel_fft(), n=nTu).reshape(nTrans, nT,
+        upsample).mean(-1)`` (``torch.fft`` conventions). For a unit impulse
+        at one voxel, ``u`` is the spatial impulse response (SIR) of that
+        voxel, averaged over each upsampled time bin and up to a constant
+        factor. Overwrites ``d_su_``.
+
+        Args:
+            p: Input pressure, ``(Nx, Ny, Nz)`` float64 CUDA tensor.
+            su: Optional preallocated ``(nTrans, nTu)`` float64 CUDA tensor,
+                filled in place.
+
+        Returns:
+            The ``(nTrans, nTu)`` tensor ``su``.
+        """
+        if su is None:
+            su = torch.empty((self.nTrans, self.nTu), device=p.device, dtype=torch.float64)
+        if self.checkEntry(p, (self.Nx, self.Ny, self.Nz)) and self.checkEntry(
+            su, (self.nTrans, self.nTu)
+        ):
+            self._lib.computeSignalU(
+                self.instance, c_void_p(p.data_ptr()), c_void_p(su.data_ptr())
+            )
+        return su
+
+    def get_kernel_fft(self):
+        """Copy of the convolution kernel used by the forward and adjoint products.
+
+        Returns:
+            ``complex128`` CUDA tensor of size ``nTu // 2 + 1``: the
+            unnormalized real FFT of :meth:`get_kernel`.
+        """
+        fg = torch.empty(self.nTu // 2 + 1, device="cuda", dtype=torch.complex128)
+        self._lib.getKernel(self.instance, c_void_p(fg.data_ptr()))
+        return fg
+
+    def get_kernel(self):
+        """Convolution kernel in time, on the upsampled grid (step ``dt / upsample``).
+
+        The kernel is the system kernel of the radial basis function,
+        convolved with the Gaussian laser pulse and the EIR when they are
+        set, computed on a 101 times finer grid and averaged back. It is
+        circular, with zero lag at index 0 and negative lags at the end;
+        ``torch.fft.fftshift`` centers it.
+
+        Returns:
+            float64 CUDA tensor of size ``nTu``.
+        """
+        return torch.fft.irfft(self.get_kernel_fft(), n=self.nTu)
+
+    def get_upsampled_eir(self):
+        """EIR on the upsampled grid, interpolated as in the CUDA library.
+
+        The real FFT of the zero-padded EIR (length ``nT``) is zero-padded to
+        ``nTu``, that is, band-limited interpolation. With this scaling the
+        sum equals the sum of the EIR (amplitude ``eir / upsample``), so the
+        result is a discrete kernel on the upsampled grid.
+
+        Returns:
+            ``(nTu,)`` NumPy array with zero lag at index 0, or ``None`` if
+            no EIR was given.
+        """
+        if self.eir_padded is None:
+            return None
+        return np.fft.irfft(np.fft.rfft(self.eir_padded), n=self.nTu)
 
     def __matmul__(self, p):
         """Compute ``pat @ p`` (forward) or ``pat.T @ s`` (adjoint).

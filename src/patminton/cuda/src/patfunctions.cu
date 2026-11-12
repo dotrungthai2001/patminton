@@ -6,6 +6,7 @@
 #include "cufftUtility.h"
 #include "math.h"
 #include "elliptic_integrals.cuh"
+#include <cub/block/block_scan.cuh>
 // #include <boost/math/special_functions/ellint_2.hpp>
 // #include <boost/math/special_functions/ellint_1.hpp>
 
@@ -901,19 +902,11 @@ __device__ void splitZDomain(double zl, double h, double Zsq[2][2], int &n_upsil
 	}
 }
 
-// True when the arrival [rmin, rmax] / c lies entirely outside the time
-// window. The clamped time indices would then put the whole patch area on an
-// edge sample, or write to index -1 when the arrival ends before tStart.
-__device__ __forceinline__ bool outsideWindow(double rmin, double rmax, double c,
-					double tStart, double dt, int nT) {
-	return (ceil((rmax / c - tStart) / dt) <= 0) || (floor((rmin / c - tStart) / dt) >= nT) ;
-}
-
 // =============================================
 // === Cylindrical transducers with Elliptic ===
 // =============================================
 
-template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 					int nTrans,
 					double tStart, int nT, double dt, double c,
 					const double* const infos_transducers,
@@ -922,6 +915,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 					int Nphi, int Nk, double eps,
 					int upsample, int steps_border, int steps,
+					const StepsMap steps_map,
 					const bool use_sparse_optimization,
 					double p[], double s[]
 ) {
@@ -988,7 +982,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 		double twoRD ;
 
 		// variable to track steps
-		int it_min_upsample, it_max_upsample, step, step_prev, istep ;
+		int it_min_upsample, it_max_upsample, step, step_prev ;
 		double value, value_prev, interp_value ;
 
 
@@ -1021,6 +1015,10 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 			zs = z - zc ;
 
 			gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, xl, yl, zl) ;
+
+			// steps of this voxel: scalar steps or nearest node of the steps map (transducer frame)
+			int steps_voxel = (steps_map.steps != nullptr) ? lookupSteps(steps_map, xl, yl, zl) : steps ;
+			int steps_border_voxel = (steps_border > 0) ? steps_border : steps_voxel ; // <= 0: same as steps
 			a = atan2(yl,xl) ;
 			Dsq = xl*xl + yl*yl ;
 			D = sqrt(Dsq) ;
@@ -1057,7 +1055,6 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					ralpha = sqrt(Dsq + Rsq + Zsq_max - twoRD*cos_theta_min) ;
                     rbeta = sqrt(Dsq + Rsq + Zsq_min - twoRD*cos_theta_max) ;
 
-					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT-1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT-1), 0)  ;
 					it_alpha = max(min((int)floor((ralpha / c - tStart) / dt), nT-1), 0);
@@ -1071,10 +1068,11 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					cos_alpha = cos_theta_min ;
 					cos_beta = cos_theta_min ;
 					I = 0. ;
+					value_prev = 0. ; // value of the previous block (derivative buffer)
 					// value_prev = 0.0 // for linear interp
 					// step_prev = 0.0 // for linear interp
 
-					for (itime = it_min ; itime < it_max ; ) {
+					for (itime = it_min ; itime < (it_max-1) ; ) {
 					    // first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
                         // then every upsample iteration compute area
                         // last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1085,7 +1083,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 						// 			? min(steps_border, it_max-1 - itime + 1)
 						// 			: upsample;
 
-						step = computeStep(itime,it_min, it_max, it_alpha, it_beta, steps_border, steps, upsample) ;
+						step = computeStep(itime,it_min, it_max, it_alpha, it_beta, steps_border_voxel, steps_voxel, upsample) ;
 
 						time = tStart + itime * dt;
 						time_next = time + step*dt;
@@ -1113,12 +1111,13 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 
 						area = (alpha_next - alpha) * Zmax + I_next - I - (beta_next - beta) * Zmin;
 
-						// replicate the computed value on the step next values in s_transducer
+						// value of the bins [itime, itime+step). s_transducer is a derivative buffer (d_su_ is
+						// its prefix sum over time, rowScan after the kernel): the blocks are contiguous, so
+						// only the jump from the previous block is written, at the first bin of the block
 						double inv_time = fast_inversion(step*time) ;
 						value = area*Rvp * inv_time ;
-						for (istep = 0 ; istep < step ; istep++) {
-						    atomicAdd(&s_transducer[itime+istep], value) ;
-						}
+						atomicAdd(&s_transducer[itime], value - value_prev) ;
+						value_prev = value ;
 
 						// write the value : only when upsample = 1
 						// atomicAdd(&s_transducer[itime], area * Rvp / time);
@@ -1153,7 +1152,10 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					I_next = 0. ;
 					area = (alpha_next - alpha)*Zmax - I - (beta_next - beta) * Zmin ;
 
-					atomicAdd(&s_transducer[itime], area*Rvp/time) ;
+					// last bin it_max-1, then back to zero at it_max (it_max <= nT-1)
+					value = area*Rvp/time ;
+					atomicAdd(&s_transducer[itime], value - value_prev) ;
+					atomicAdd(&s_transducer[it_max], -value) ;
 				// }
 				}
 			}
@@ -1170,6 +1172,7 @@ template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Lut>(int N
 					const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 					int Nphi, int Nk, double eps,
 					int upsample, int steps_border, int steps,
+					const StepsMap steps_map,
 					const bool use_sparse_optimization,
 					double p[], double s[]) ;
 
@@ -1182,6 +1185,7 @@ template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Exact>(int
 					const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 					int Nphi, int Nk, double eps,
 					int upsample, int steps_border, int steps,
+					const StepsMap steps_map,
 					const bool use_sparse_optimization,
 					double p[], double s[]) ;
 
@@ -1194,10 +1198,11 @@ template __global__ void linkingCylinderToGrid_Elliptic<EllipticMode::Trapezoida
                     const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
                     int Nphi, int Nk, double eps,
                     int upsample, int steps_border, int steps,
+                    const StepsMap steps_map,
                     const bool use_sparse_optimization,
                     double p[], double s[]) ;
 
-template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 				int nTrans,
 				double tStart, int nT, double dt, double c,
 				const double* const infos_transducers,
@@ -1206,6 +1211,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 				const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 				int Nphi, int Nk, double eps,
 				int upsample, int steps_border, int steps,
+				const StepsMap steps_map,
 				double p[], double s []
 ) {
 
@@ -1269,8 +1275,9 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 		double twoRD ;
 
 		// variable to track steps
-		int it_min_upsample, it_max_upsample, step, step_prev, istep ;
-		// double value_prev, interp_value ; // for linear interp
+		int it_min_upsample, it_max_upsample, step, step_prev ;
+		double value_prev ; // value of the previous block (derivative buffer)
+		// double interp_value ; // for linear interp
 
 		for (int id_trans = 0 ; id_trans < nTrans ; id_trans++) {
 			// gathering infos of the transducer
@@ -1301,6 +1308,10 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 			zs = z - zc ;
 
 			gridToCylinderCoords(xs, ys, zs, e1x, e1y, e1z, e2x, e2y, e2z, xl, yl, zl) ;
+
+			// steps of this voxel: scalar steps or nearest node of the steps map (transducer frame)
+			int steps_voxel = (steps_map.steps != nullptr) ? lookupSteps(steps_map, xl, yl, zl) : steps ;
+			int steps_border_voxel = (steps_border > 0) ? steps_border : steps_voxel ; // <= 0: same as steps
 			a = atan2(yl,xl) ;
 			Dsq = xl*xl + yl*yl ;
 			D = sqrt(Dsq) ;
@@ -1338,7 +1349,6 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					ralpha = sqrt(Dsq + Rsq + Zsq_max - twoRD*cos_theta_min) ;
                     rbeta = sqrt(Dsq + Rsq + Zsq_min - twoRD*cos_theta_max) ;
 
-					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT-1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT-1), 0)  ;
 					it_alpha = max(min((int)floor((ralpha / c - tStart) / dt), nT-1), 0);
@@ -1353,10 +1363,11 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					cos_alpha = cos_theta_min ;
 					cos_beta = cos_theta_min ;
 					I = 0. ;
+					value_prev = 0. ;
 					// value_prev = 0.0 // for linear interp
 					// step_prev = 0.0 // for linear interp
 
-					for (itime = it_min ; itime < it_max ; ) {
+					for (itime = it_min ; itime < (it_max-1) ; ) {
 					    // first iterations from it_min to the next time on the coarse grid, compute every steps_border steps
                         // then every upsample iteration compute area
                         // last iterations from previous time on the coarse grid to it_max, compute every steps_border steps
@@ -1367,7 +1378,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 						// 		? min(steps_border, it_max-1 - itime + 1)
 						// 		: upsample;
 
-						step = computeStep(itime,it_min, it_max, it_alpha, it_beta, steps_border, steps, upsample) ;
+						step = computeStep(itime,it_min, it_max, it_alpha, it_beta, steps_border_voxel, steps_voxel, upsample) ;
 
 						time = tStart + itime * dt;
 						time_next = time + step*dt;
@@ -1394,12 +1405,13 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 						}
 						area = (alpha_next - alpha) * Zmax + I_next - I - (beta_next - beta) * Zmin;
 
-						// adjoint of replication : sum
+						// adjoint of the jump written by the forward kernel: s_transducer holds the suffix
+						// sums of the correlated signal (rowScan before the kernel), so the sum of the signal
+						// over all the bins of the blocks is obtained with one read per block
 						double inv_time = fast_inversion(step*time) ;
 						value = area* inv_time ;
-						for (istep = 0 ; istep < step ; istep++) {
-							value_transducer += s_transducer[itime+istep] * value ;
-						}
+						value_transducer += s_transducer[itime] * (value - value_prev) ;
+						value_prev = value ;
 
 						// value_transducer += s_transducer[itime+istep] * area / time / step ;
 						// TODO: adjoint of linear interpolation
@@ -1425,7 +1437,8 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
 					I_next = 0. ;
 					area = (alpha_next - alpha)*Zmax - I - (beta_next - beta) * Zmin ;
 
-					value_transducer += s_transducer[itime] * area / time ;
+					value = area / time ;
+					value_transducer += s_transducer[itime] * (value - value_prev) - s_transducer[it_max] * value ;
 				// }
 				}
 			}
@@ -1445,6 +1458,7 @@ template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Lut>(int 
 					const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 					int Nphi, int Nk, double eps,
 					int upsample, int steps_border, int steps,
+					const StepsMap steps_map,
 					double p[], double s[]) ;
 
 template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Exact>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
@@ -1456,6 +1470,7 @@ template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Exact>(in
 					const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 					int Nphi, int Nk, double eps,
 					int upsample, int steps_border, int steps,
+					const StepsMap steps_map,
 					double p[], double s[]) ;
 
 template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Trapezoidal>(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
@@ -1467,6 +1482,7 @@ template __global__ void linkingCylinderToGridT_Elliptic<EllipticMode::Trapezoid
                     const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
                     int Nphi, int Nk, double eps,
                     int upsample, int steps_border, int steps,
+                    const StepsMap steps_map,
                     double p[], double s[]) ;
 
 
@@ -1551,8 +1567,29 @@ __device__ inline int computeStep(int itime, int it_min, int it_max, int it_alph
         step = min(steps,next_window-itime+1);
     }
 
-    step = min(step,it_max-itime+1) ;
+    step = min(step,it_max-1-itime) ; // never write past it_max-1 (filled after the loop)
     return step ;
+}
+
+// index of the node of coords (n increasing values) nearest to v; clamped to [0, n-1]
+__device__ inline int nearestIndex(const double* __restrict__ coords, int n, double v) {
+    if (v <= coords[0]) return 0 ;
+    if (v >= coords[n-1]) return n-1 ;
+    int lo = 0, hi = n-1 ; // coords[lo] < v < coords[hi]
+    while (hi - lo > 1) {
+        int mid = (lo + hi) / 2 ;
+        if (coords[mid] <= v) lo = mid ;
+        else hi = mid ;
+    }
+    return (v - coords[lo] <= coords[hi] - v) ? lo : hi ;
+}
+
+// steps of the nearest node of the map to the point (xl, yl, zl) of the transducer frame
+__device__ inline int lookupSteps(const StepsMap &map, double xl, double yl, double zl) {
+    int ix = nearestIndex(map.x, map.nx, xl) ;
+    int iy = nearestIndex(map.y, map.ny, yl) ;
+    int iz = nearestIndex(map.z, map.nz, zl) ;
+    return map.steps[(ix*map.ny + iy)*map.nz + iz] ;
 }
 
 
@@ -1812,7 +1849,6 @@ __global__ void linkingPlanesToGrid(int Nx, int Ny, int Nz, double Lx, double Ly
 					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
 					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
-					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
 					it_min_upsample = upsample * (it_min / upsample + 1);
@@ -1987,7 +2023,6 @@ __global__ void linkingPlanesToGridT(int Nx, int Ny, int Nz, double Lx, double L
 					rmin = sqrt( Xsq_min + Ysq_min + z_pl*z_pl);
 					rmax = sqrt( Xsq_max + Ysq_max + z_pl*z_pl);
 
-					if (outsideWindow(rmin, rmax, c, tStart, dt, nT)) continue ;
 					it_min = max(min((int)floor((rmin / c - tStart) / dt), nT - 1), 0);
 					it_max = max(min((int)ceil((rmax / c - tStart) / dt), nT - 1), 0);
 					it_min_upsample = upsample * (it_min / upsample + 1);
@@ -2094,4 +2129,30 @@ __device__ inline double squared(double x) {
 __device__ inline double fast_inversion(double x) {
     double inv = __frcp_rn(x);
     return inv * (2.0 - x * inv); // one NR iteration
+}
+
+// Prefix sums over time of each row of s (nRows x n, row-major), in place, one block of
+// ROW_SCAN_BLOCK threads per row (tiles of ROW_SCAN_BLOCK values, carry between tiles).
+// reverse = false: s[t] <- s[0] + ... + s[t]; reverse = true: s[t] <- s[t] + ... + s[n-1].
+// The elliptic cylinder kernels write the derivative (jumps) of the upsampled signal: the forward
+// scan rebuilds d_su_, and the reverse scan (its adjoint) prepares the backprojection.
+__global__ void rowScan(double s[], int nRows, int n, bool reverse) {
+	typedef cub::BlockScan<double, ROW_SCAN_BLOCK> BlockScan ;
+	__shared__ typename BlockScan::TempStorage temp ;
+	__shared__ double carry ;
+	if (blockIdx.x >= nRows) return ;
+	double *row = s + (size_t)blockIdx.x * n ;
+	if (threadIdx.x == 0) carry = 0. ;
+	__syncthreads() ;
+	for (int base = 0 ; base < n ; base += ROW_SCAN_BLOCK) {
+		int t = base + threadIdx.x ;
+		int idx = reverse ? n - 1 - t : t ;
+		double v = (t < n) ? row[idx] : 0. ;
+		double tile_sum ;
+		BlockScan(temp).InclusiveSum(v, v, tile_sum) ;
+		if (t < n) row[idx] = v + carry ;
+		__syncthreads() ; // carry and temp are read by every thread before being updated / reused
+		if (threadIdx.x == 0) carry += tile_sum ;
+		__syncthreads() ;
+	}
 }

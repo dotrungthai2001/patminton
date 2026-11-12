@@ -70,13 +70,9 @@ __device__ void splitZDomain(double zl, double h, double Zsq[2][2], int &n_upsil
 // === Cylindrical transducers with Elliptic ===
 // =============================================
 
-// Largest thread block the kernels below accept: blockSize = 8 (the default)
-// gives 8^3 = 512 threads. With one block per SM, this caps registers at 128
-// per thread; without it the Exact kernels use up to 154 and fail to launch.
-#define ELLIPTIC_MAX_THREADS 512
 
 /// Forward operator using elliptic integrals (with bilinear-interpolated LUTs)
-template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void linkingCylinderToGrid_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
     				int nTrans,
     				double tStart, int nT, double dt, double c,
 					const double* const infos_transducers,
@@ -85,11 +81,12 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
      				const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
     				int Nphi, int Nk, double eps,
                     int upsample, int steps_border, int steps,
+                    const StepsMap steps_map,
 					const bool use_sparse_optimization,
 					double d_p[], double d_s []);
 
 /// Adjoint operator using elliptic integrals (with LUTs)
-template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THREADS, 1) linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
+template <EllipticMode mode> __global__ void linkingCylinderToGridT_Elliptic(int Nx, int Ny, int Nz, double Lx, double Ly, double Lz,
 				int nTrans,
 				double tStart, int nT, double dt, double c,
 				const double* const infos_transducers,
@@ -98,6 +95,7 @@ template <EllipticMode mode> __global__ void __launch_bounds__(ELLIPTIC_MAX_THRE
     			const double* __restrict__ delta_sinphi0, const double* __restrict__  delta_k0,
 				int Nphi, int Nk, double eps,
                 int upsample, int steps_border, int steps,
+                const StepsMap steps_map,
 				double d_p[], double d_s []);
 
 __device__ double bilinear_interp_E_lut(double sinphi, double k,
@@ -124,7 +122,12 @@ __device__ double compute_I(double cos_alpha, double cos_beta, double a, double 
 
 __device__ double compute_I_exact(double alpha, double beta, double a, double b) ;
 
+// in-place prefix sums of each row (reverse: suffix sums), launched with nRows blocks of ROW_SCAN_BLOCK threads
+#define ROW_SCAN_BLOCK 256
+__global__ void rowScan(double s[], int nRows, int n, bool reverse) ;
 __device__ inline int computeStep(int itime, int it_min, int it_max, int it_alpha, int it_beta, int steps_border, int steps, int upsample) ;
+__device__ inline int nearestIndex(const double* __restrict__ coords, int n, double v) ;
+__device__ inline int lookupSteps(const StepsMap &map, double xl, double yl, double zl) ;
 
 
 // ======================================

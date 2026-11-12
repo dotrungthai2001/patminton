@@ -226,6 +226,27 @@ void PAT::PMVT(double d_p[], double d_s[]) {
 	cudaDeviceSynchronize() ;
 }
 
+void PAT::getSignalU(double d_su[]) {
+	HANDLE_ERROR( cudaMemcpy(d_su, d_su_, nTu_*nTransducers_*sizeof(double), cudaMemcpyDeviceToDevice) ) ;
+	cudaDeviceSynchronize() ;
+}
+
+void PAT::getKernel(double d_fg[]) {
+	HANDLE_ERROR( cudaMemcpy(d_fg, d_fg_, fftNtu_*sizeof(cufftDoubleComplex), cudaMemcpyDeviceToDevice) ) ;
+	cudaDeviceSynchronize() ;
+}
+
+void PAT::computeSignalU(double d_p[], double d_su[]) {
+
+	zeroingArray<<<dimGridSu_,dimBlock2d_>>>(d_su_, nTransducers_, nTu_, 1) ;
+	HANDLE_ERROR( cudaGetLastError() );
+
+	compute_signal_u(d_p) ; // stores result in d_su_
+	HANDLE_ERROR( cudaGetLastError() );
+
+	getSignalU(d_su) ;
+}
+
 PAT::~PAT() {
 	// Free allocated memory
 	HANDLE_ERROR( cudaFree( d_fg_ )) ;
@@ -295,7 +316,9 @@ PAT_cylinder::PAT_cylinder(int Nx, int Ny, int Nz, double Lx, double Ly, double 
 				bool use_sparse_optimization
 )
 	: PAT(Nx, Ny, Nz, Lx, Ly, Lz, nT, tStart, dt, c, nTrans, upsample, blockSize, laser_pulse_variance, eir, use_sparse_optimization),
-	steps_border_(steps_border), steps_(steps) {
+	steps_border_(steps_border), steps_(steps),
+	d_steps_map_(nullptr), d_steps_map_x_(nullptr), d_steps_map_y_(nullptr), d_steps_map_z_(nullptr),
+	steps_map_nx_(0), steps_map_ny_(0), steps_map_nz_(0) {
 
 	HANDLE_ERROR(cudaMalloc(&d_infos_transducers_, 12*nTransducers_*sizeof(double))) ;
  	// Copy point locations to GPU
@@ -307,6 +330,51 @@ PAT_cylinder::PAT_cylinder(int Nx, int Ny, int Nz, double Lx, double Ly, double 
 PAT_cylinder::~PAT_cylinder() {
 	// Free allocated memory
 	HANDLE_ERROR( cudaFree( d_infos_transducers_ )) ;
+	freeStepsMap() ;
+}
+
+void PAT_cylinder::freeStepsMap() {
+	// cudaFree(nullptr) is a no-op
+	HANDLE_ERROR( cudaFree( d_steps_map_ )) ;
+	HANDLE_ERROR( cudaFree( d_steps_map_x_ )) ;
+	HANDLE_ERROR( cudaFree( d_steps_map_y_ )) ;
+	HANDLE_ERROR( cudaFree( d_steps_map_z_ )) ;
+	d_steps_map_ = nullptr ;
+	d_steps_map_x_ = d_steps_map_y_ = d_steps_map_z_ = nullptr ;
+	steps_map_nx_ = steps_map_ny_ = steps_map_nz_ = 0 ;
+}
+
+void PAT_cylinder::setStepsMap(const int *steps, const double *x, const double *y, const double *z,
+                               int nx, int ny, int nz) {
+	freeStepsMap() ;
+	size_t n = (size_t)nx * ny * nz ;
+	HANDLE_ERROR( cudaMalloc(&d_steps_map_, n*sizeof(int)) ) ;
+	HANDLE_ERROR( cudaMalloc(&d_steps_map_x_, nx*sizeof(double)) ) ;
+	HANDLE_ERROR( cudaMalloc(&d_steps_map_y_, ny*sizeof(double)) ) ;
+	HANDLE_ERROR( cudaMalloc(&d_steps_map_z_, nz*sizeof(double)) ) ;
+	HANDLE_ERROR( cudaMemcpy(d_steps_map_, steps, n*sizeof(int), cudaMemcpyHostToDevice) ) ;
+	HANDLE_ERROR( cudaMemcpy(d_steps_map_x_, x, nx*sizeof(double), cudaMemcpyHostToDevice) ) ;
+	HANDLE_ERROR( cudaMemcpy(d_steps_map_y_, y, ny*sizeof(double), cudaMemcpyHostToDevice) ) ;
+	HANDLE_ERROR( cudaMemcpy(d_steps_map_z_, z, nz*sizeof(double), cudaMemcpyHostToDevice) ) ;
+	steps_map_nx_ = nx ;
+	steps_map_ny_ = ny ;
+	steps_map_nz_ = nz ;
+}
+
+void PAT_cylinder::scanSignalU(bool reverse) {
+	rowScan<<<nTransducers_, ROW_SCAN_BLOCK>>>(d_su_, nTransducers_, nTu_, reverse) ;
+}
+
+StepsMap PAT_cylinder::stepsMap() const {
+	StepsMap map ;
+	map.steps = d_steps_map_ ;
+	map.x = d_steps_map_x_ ;
+	map.y = d_steps_map_y_ ;
+	map.z = d_steps_map_z_ ;
+	map.nx = steps_map_nx_ ;
+	map.ny = steps_map_ny_ ;
+	map.nz = steps_map_nz_ ;
+	return map ;
 }
 
 //----------------------------------------------------------------------------
@@ -374,12 +442,14 @@ void PAT_cylinder_exact::compute_signal_u(double* d_p) {
             		nullptr, nullptr,
             		nullptr, nullptr,
             		0, 0, 0.0,
-            		upsampling_,steps_border_,steps_,
+            		upsampling_,steps_border_,steps_, stepsMap(),
             		use_sparse_optimization_,
             		d_p, d_su_);
+	scanSignalU(false) ; // d_su_ = prefix sum of the jumps written by the kernel
 }
 
 void PAT_cylinder_exact::bp_signal_u(double* d_p) {
+	scanSignalU(true) ; // suffix sums of d_su_, read once per block by the kernel
     linkingCylinderToGridT_Elliptic<EllipticMode::Exact><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
        	nTransducers_,
          tStart_, nTu_, dtu_, c_, d_infos_transducers_,
@@ -387,7 +457,7 @@ void PAT_cylinder_exact::bp_signal_u(double* d_p) {
  		nullptr, nullptr,
  		nullptr, nullptr,
  		0, 0, 0.0,
- 		upsampling_,steps_border_,steps_,
+ 		upsampling_,steps_border_,steps_, stepsMap(),
  		d_p, d_su_);
 }
 //----------------------------------------------------------------------------
@@ -418,12 +488,14 @@ void PAT_cylinder_trapezoidal::compute_signal_u(double* d_p) {
             		nullptr, nullptr,
             		nullptr, nullptr,
             		0, 0, 0.0,
-            		upsampling_,steps_border_,steps_,
+            		upsampling_,steps_border_,steps_, stepsMap(),
             		use_sparse_optimization_,
             		d_p, d_su_);
+	scanSignalU(false) ; // d_su_ = prefix sum of the jumps written by the kernel
 }
 
 void PAT_cylinder_trapezoidal::bp_signal_u(double* d_p) {
+	scanSignalU(true) ; // suffix sums of d_su_, read once per block by the kernel
     linkingCylinderToGridT_Elliptic<EllipticMode::Trapezoidal><<<dimGrid_, dimBlock_>>>(Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
        	nTransducers_,
         tStart_, nTu_, dtu_, c_, d_infos_transducers_,
@@ -431,7 +503,7 @@ void PAT_cylinder_trapezoidal::bp_signal_u(double* d_p) {
  		nullptr, nullptr,
  		nullptr, nullptr,
  		0, 0, 0.0,
- 		upsampling_,steps_border_,steps_,
+ 		upsampling_,steps_border_,steps_, stepsMap(),
  		d_p, d_su_);
 }
 //----------------------------------------------------------------------------
@@ -494,12 +566,14 @@ void PAT_cylinder_lut::compute_signal_u(double* d_p) {
 						d_sinphi0_, d_k0_,
 						d_delta_sinphi0_, d_delta_k0_,
 						Nphi_, Nk_, eps_,
-						upsampling_,steps_border_,steps_,
+						upsampling_,steps_border_,steps_, stepsMap(),
 						use_sparse_optimization_,
 						d_p, d_su_);
+	scanSignalU(false) ; // d_su_ = prefix sum of the jumps written by the kernel
 }
 
 void PAT_cylinder_lut::bp_signal_u(double* d_p) {
+	scanSignalU(true) ; // suffix sums of d_su_, read once per block by the kernel
   		linkingCylinderToGridT_Elliptic<EllipticMode::Lut><<<dimGrid_, dimBlock_>>>(
 		                Nx_, Ny_, Nz_, Lx_, Ly_, Lz_,
 						nTransducers_,
@@ -508,6 +582,6 @@ void PAT_cylinder_lut::bp_signal_u(double* d_p) {
 						d_sinphi0_, d_k0_,
 						d_delta_sinphi0_, d_delta_k0_,
 						Nphi_, Nk_, eps_,
-						upsampling_,steps_border_,steps_,
+						upsampling_,steps_border_,steps_, stepsMap(),
 						d_p, d_su_);
 }
